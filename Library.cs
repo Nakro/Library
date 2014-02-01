@@ -5061,4 +5061,317 @@ namespace Library
     }
     #endregion
 
+    // ===============================================================================================
+    // 
+    // Library.[Online]
+    // 
+    // ===============================================================================================
+
+    // ===============================================================================================
+    // Autor        : Peter Širka
+    // Created      : 04. 05. 2008
+    // Updated      : 01. 02. 2014
+    // Description  : Online stats
+    // ===============================================================================================
+
+    #region Online
+    public class Analytics
+    {
+        private const string COOKIE = "__po";
+
+        public class Statistics
+        {
+            public int Day { get; set; }
+            public int Month { get; set; }
+            public int Year { get; set; }
+
+            public int Hits { get; set; }
+            public int Unique { get; set; }
+            public int Count { get; set; }
+
+            public int Search { get; set; }
+            public int Direct { get; set; }
+            public int Social { get; set; }
+            public int Unknown { get; set; }
+            public int Advert { get; set; }
+
+            public int Mobile { get; set; }
+            public int Desktop { get; set; }
+        }
+
+        public class OnlineIp
+        {
+            public string Ip { get; set; }
+            public string Url { get; set; }
+
+            public OnlineIp(string ip, string url)
+            {
+                Ip = ip;
+                Url = url;
+            }
+        }
+
+        public Analytics(bool allowXhr = false, bool allowIp = true)
+        {
+            Load();
+
+            Timer = new System.Timers.Timer(30000);
+            Timer.Elapsed += (o, e) => { Service(); };
+            Timer.Start();
+            AllowIp = allowIp;
+            AllowXhr = allowXhr;
+
+            if (allowIp)
+                Ip = new List<OnlineIp>(10);
+        }
+
+        public int Online { get; set; }
+        public DateTime LastVisit { get; set; }
+        public Statistics Stats { get; set; }
+
+        private System.Timers.Timer Timer = null;
+        private long Ticks { get; set; }
+        private int Last { get; set; }
+        private int Interval { get; set; }
+
+        private int[] Generation = new int[2] { 0, 0 };
+
+        private Regex reg_robot = new Regex("bot|crawler", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+        private Regex reg_mobile = new Regex("Android|webOS|iPhone|iPad|iPod|BlackBerry|Windows.?Phone", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+        private string[] ArrSocial = new string[] { "plus.url.google", "plus.google", "twitter", "facebook", "linkedin", "tumblr", "flickr", "instagram" };
+        private string[] ArrSearch = new string[] { "google", "bing", "yahoo" };
+
+        public Func<HttpRequest, bool> onValid { get; set; }
+        public List<OnlineIp> Ip { get; set; }
+
+        public bool AllowXhr { get; set; }
+        public bool AllowIp { get; set; }
+
+        public void Add(HttpRequest req, HttpResponse res)
+        {
+            if (req.HttpMethod != "GET")
+                return;
+
+            if (req.UserLanguages == null || req.UserLanguages.Length == 0)
+                return;
+
+            if (req.AcceptTypes == null || req.AcceptTypes.Length == 0)
+                return;
+
+            var ua = req.UserAgent;
+
+            if (ua.IsEmpty())
+                return;
+
+            if (req.Headers["X-moz"] == "prefetch")
+                return;
+
+            if (reg_robot.IsMatch(ua))
+                return;
+
+            if (!AllowXhr && req.Headers["X-Requested-With"] == "XMLHttpRequest")
+                return;
+
+            if (onValid != null && !onValid(req))
+                return;
+
+            long user = 0;
+
+            var cookie = req.Cookies[COOKIE];
+            var now = DateTime.Now;
+            var ticks = now.Ticks;
+
+            if (cookie != null)
+                user = cookie.Value.To<long>();
+
+            var sum = user == 0 ? 1000 : (ticks - user) / TimeSpan.TicksPerSecond;
+            var exists = sum < 31;
+            var referer = req.UrlReferrer.Host;
+
+            Stats.Hits++;
+            Change(req);
+
+            if (exists)
+                return;
+
+            var isUnique = false;
+
+            if (user > 0)
+            {
+                sum = Math.Abs(this.Ticks - user) / TimeSpan.TicksPerSecond;
+                if (sum < 41)
+                    return;
+
+                var date = new DateTime(user);
+                if (date.Day != now.Day && date.Month != now.Month && date.Year != now.Year)
+                    isUnique = true;
+            }
+            else
+                isUnique = true;
+
+            if (isUnique)
+            {
+                Stats.Unique++;
+                if (reg_mobile.IsMatch(ua))
+                    Stats.Mobile++;
+                else
+                    Stats.Desktop++;
+            }
+
+            Generation[1]++;
+            res.Cookies.Set(new HttpCookie(COOKIE, ticks.ToString()) { Expires = now.AddDays(5) });
+
+            if (AllowIp)
+                Ip.Add(new OnlineIp(req.UserHostAddress, req.RawUrl));
+
+            if (Last != Online)
+            {
+                if (AllowIp)
+                {
+                    var count = Ip.Count - Math.Abs(Last - Online);
+                    if (count <= 0)
+                        Ip.Clear();
+                    else
+                        Ip = Ip.Take(count).ToList();
+                }
+                Last = Online;
+            }
+
+            Stats.Count++;
+
+            if (req.QueryString["utm_medium"].IsNotEmpty() || req.QueryString["utm_source"].IsNotEmpty())
+            {
+                Stats.Advert++;
+                return;
+            }
+
+            if (referer.IsEmpty())
+            {
+                Stats.Direct++;
+                return;
+            }
+
+            for (var i = 0; i < ArrSocial.Length; i++)
+            {
+                if (referer.Contains(ArrSocial[i]))
+                {
+                    Stats.Social++;
+                    return;
+                }
+            }
+
+            for (var i = 0; i < ArrSearch.Length; i++)
+            {
+                if (referer.Contains(ArrSearch[i]))
+                {
+                    Stats.Search++;
+                    return;
+                }
+            }
+
+            Stats.Unknown++;
+        }
+
+        private void Service()
+        {
+            Interval++;
+
+            var now = DateTime.Now;
+            Ticks = now.Ticks;
+
+            if (Stats.Day != now.Day && Stats.Month != now.Month && Stats.Year != now.Year)
+            {
+                if (Stats.Day != 0)
+                {
+                    Append();
+                    Stats.Advert = 0;
+                    Stats.Count = 0;
+                    Stats.Desktop = 0;
+                    Stats.Direct = 0;
+                    Stats.Hits = 0;
+                    Stats.Mobile = 0;
+                    Stats.Search = 0;
+                    Stats.Social = 0;
+                    Stats.Unique = 0;
+                    Stats.Unknown = 0;
+                }
+
+                Stats.Day = now.Day;
+                Stats.Month = now.Month;
+                Stats.Year = now.Year;
+                Save();
+            }
+            else if (Interval % 2 == 0)
+                Save();
+
+            var tmp0 = Generation[0];
+            var tmp1 = Generation[1];
+
+            Generation[1] = 0;
+            Generation[0] = tmp1;
+
+            if (tmp0 != Generation[0] || tmp1 != Generation[1])
+            {
+                var online = Generation[0] + Generation[1];
+                if (online != Last)
+                {
+                    if (AllowIp)
+                    {
+                        var count = Ip.Count - tmp0;
+                        if (count <= 0)
+                            Ip.Clear();
+                        else
+                            Ip = Ip.Take(count).ToList();
+                    }
+
+                    Last = online;
+                }
+            }
+        }
+
+        private void Append()
+        {
+            System.IO.File.AppendAllText("online.json".PathData(), Stats.JsonSerialize() + "\n");
+        }
+
+        private void Save()
+        {
+            System.IO.File.WriteAllText("online-state.json".PathData(), Stats.JsonSerialize());
+        }
+
+        private void Load()
+        {
+            var filename = "online-state.json".PathData();
+            if (!System.IO.File.Exists(filename))
+                return;
+
+            Stats = System.IO.File.ReadAllText(filename).JsonDeserialize<Statistics>();
+        }
+
+        private void Change(HttpRequest req)
+        {
+            var referer = req.UrlReferrer.ToString();
+            if (referer.IsEmpty())
+                return;
+
+            if (!AllowIp)
+                return;
+
+            var item = Ip.FirstOrDefault(n => n.Ip == req.UserHostAddress && n.Url == referer);
+            if (item == null)
+                return;
+
+            item.Url = req.Url.ToString();
+        }
+
+        public List<Statistics> GetStatistics()
+        {
+            var filename = "online.json".PathData();
+            if (!System.IO.File.Exists(filename))
+                return new List<Statistics>(0);
+            return System.IO.File.ReadAllText(filename).JsonDeserialize<List<Statistics>>();
+        }
+    }
+    #endregion
 }
