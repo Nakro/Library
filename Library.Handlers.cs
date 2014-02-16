@@ -4,11 +4,11 @@ using System.Linq;
 using System.Web;
 using System.Text.RegularExpressions;
 
-namespace Library.Handler
+namespace Library.Handlers
 {
     // ===============================================================================================
     // 
-    // Library.Handler.[CSS]
+    // Library.Handler.[Css]
     // 
     // ===============================================================================================
 
@@ -19,8 +19,8 @@ namespace Library.Handler
     // Description  : CSS Handler LESS, Minify
     // ===============================================================================================
 
-    #region CSS
-    public class CSS : IHttpHandler
+    #region Css
+    public class Css : IHttpHandler
     {
         public void ProcessRequest(HttpContext context)
         {
@@ -35,7 +35,7 @@ namespace Library.Handler
             {
                 if (Configuration.IsDebug)
                 {
-                    context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(Module.Less.Compile(System.IO.File.ReadAllText(context.Server.MapPath(path)))));
+                    context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(Modules.Less.Compile(System.IO.File.ReadAllText(context.Server.MapPath(path)))));
                     return;
                 }
 
@@ -57,7 +57,7 @@ namespace Library.Handler
                 var data = Utils.CacheRead<string>(path.Substring(1), key =>
                 {
                     var expire = DateTime.Now.AddMinutes(10);
-                    return Utils.CacheWrite<string>(key, Module.Less.Compile(System.IO.File.ReadAllText(context.Server.MapPath(path))), expire);
+                    return Utils.CacheWrite<string>(key, Modules.Less.Compile(System.IO.File.ReadAllText(context.Server.MapPath(path))), expire);
                 });
 
                 context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(data));
@@ -83,7 +83,7 @@ namespace Library.Handler
 
     // ===============================================================================================
     // 
-    // Library.Handler.[JS]
+    // Library.Handler.[Js]
     // 
     // ===============================================================================================
 
@@ -94,8 +94,8 @@ namespace Library.Handler
     // Description  : JavaScript Handler Minify
     // ===============================================================================================
 
-    #region JS
-    public class JS : IHttpHandler
+    #region Js
+    public class Js : IHttpHandler
     {
         public void ProcessRequest(HttpContext context)
         {
@@ -118,7 +118,7 @@ namespace Library.Handler
                     }
 
                     using (var ms = new System.IO.MemoryStream(System.IO.File.ReadAllBytes(context.Server.MapPath(path))))
-                        context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(new Module.JavaScriptMinifier().Minify(ms)));
+                        context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(new Modules.JavaScriptMinifier().Minify(ms)));
 
                     return;
                 }
@@ -143,7 +143,7 @@ namespace Library.Handler
                 {
                     var expire = DateTime.Now.AddMinutes(10);
                     using (var ms = new System.IO.MemoryStream(System.IO.File.ReadAllBytes(context.Server.MapPath(path))))
-                        return Utils.CacheWrite<string>(key, new Module.JavaScriptMinifier().Minify(ms), expire);
+                        return Utils.CacheWrite<string>(key, new Modules.JavaScriptMinifier().Minify(ms), expire);
                 });
 
                 context.Response.BinaryWrite(System.Text.Encoding.UTF8.GetBytes(data));

@@ -16,7 +16,6 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
 using System.Reflection;
-
 using Library.Json;
 
 namespace Library
@@ -217,6 +216,11 @@ namespace Library
         /// </summary>
         public static Func<HttpContextBase, string, string, Authorization> OnAuthorization { get; set; }
         public static Func<HttpRequestBase, Authorization, ActionResult> OnAuthorizationError { get; set; }
+
+        public static Library.Modules.Analytics Analytics
+        {
+            get { return HttpContext.Current.ApplicationInstance.Modules["Analytics"] as Library.Modules.Analytics; }
+        }
 
         public static void Defaults()
         {
@@ -1352,8 +1356,8 @@ namespace Library
         public static ActionResult JsonSuccess(this Controller source, string param = "")
         {
             if (string.IsNullOrEmpty(param))
-                return new { r = true }.ToJson();
-            return new { r = true, param = param }.ToJson();
+                return new { r = true }.Json();
+            return new { r = true, param = param }.Json();
         }
 
         public static ActionResult JsonError(this Controller source, string error, string language = "")
@@ -1415,7 +1419,7 @@ namespace Library
 
             return Utils.CacheRead<string>(hash, key =>
             {
-                var js = new Module.JavaScriptMinifier();
+                var js = new Modules.JavaScriptMinifier();
                 var output = "";
 
                 using (var src = new System.IO.MemoryStream(encoding.GetBytes(source)))
@@ -1440,7 +1444,7 @@ namespace Library
 
             return Utils.CacheRead<string>(hash, key =>
             {
-                var output = Module.Less.Compile(source);
+                var output = Modules.Less.Compile(source);
 
                 if (Configuration.IsRelease)
                     return Utils.CacheWrite<string>(key, output, DateTime.Now.AddMinutes(5));
@@ -1611,7 +1615,7 @@ namespace Library
             if (onReplace != null)
                 source.Value = onReplace(source.Key, source.Value);
 
-            return new KeyValue[1] { source }.ToJson();
+            return new KeyValue[1] { source }.Json();
         }
 
         public static ActionResult JsonError(this IEnumerable<KeyValue> source, string language = "", Func<string, string, string> onReplace = null)
@@ -1625,7 +1629,7 @@ namespace Library
                     m.Value = onReplace(m.Key, m.Value);
             }
 
-            return source.ToJson();
+            return source.Json();
         }
 
         public static IList<KeyValue> ToError(this IList<KeyValue> source, string language = "", Func<string, string, string> onResource = null)
@@ -1685,7 +1689,7 @@ namespace Library
                     }
                 }
             }
-            return error.ToJson();
+            return error.Json();
         }
 
         public static bool IsEmail(this string source)
@@ -1949,6 +1953,7 @@ namespace Library
                             sb.Append(c);
                 }
             }
+
             return sb.ToString();
         }
 
@@ -2073,7 +2078,7 @@ namespace Library
             source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).MD5(), url, defaults);
         }
 
-        public static ContentResult ToJson(this object source, string contentType = "application/json", bool toUnicode = false)
+        public static ContentResult Json(this object source, string contentType = "application/json", bool toUnicode = false)
         {
             var content = new ContentResult();
             content.Content = source.JsonSerialize();
@@ -2146,29 +2151,31 @@ namespace Library
 
         public static string JsonSerialize(this object source)
         {
-            return Json.JsonSerializer.SerializeObject(source);
+            return Library.Json.JsonSerializer.SerializeObject(source);
         }
 
         public static T JsonDeserialize<T>(this string source)
         {
-            return Json.JsonSerializer.DeSerializeObject<T>(source);
+            return Library.Json.JsonSerializer.DeSerializeObject<T>(source);
         }
 
         public static dynamic JsonDeserialize(this string source)
         {
-            return Json.JsonSerializer.DeSerializeObject(source);
+            return Library.Json.JsonSerializer.DeSerializeObject(source);
         }
 
-        public static string Path(this string source)
+        public static string Path(this string source, char path = '/')
         {
             if (string.IsNullOrEmpty(source))
                 return source;
 
-            if (source[0] != '/')
-                source = '/' + source;
+            /*
+            if (source[0] != path)
+                source = path + source;
+            */
 
-            if (source[source.Length - 1] != '/')
-                source = source + '/';
+            if (source[source.Length - 1] != path)
+                source = source + path;
 
             return source;
         }
@@ -2180,12 +2187,12 @@ namespace Library
 
         public static string PathTemporary(this string source)
         {
-            return HttpContext.Current.Server.MapPath(string.Format("{0}{1}", Configuration.PathTemporary, source));
+            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Configuration.PathTemporary, source);
         }
 
         public static string PathData(this string source)
         {
-            return HttpContext.Current.Server.MapPath(string.Format("~/App_Data/{0}", source));
+            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", source);
         }
 
         public static string PathHelpers(this string source)
@@ -3692,7 +3699,7 @@ namespace Library
         }
 
         public static List<Schedule> Items = new List<Schedule>(3);
-        private static System.Timers.Timer Timer = null;
+        private static System.Threading.AutoResetEvent handle = null;
         private static System.Threading.ReaderWriterLockSlim locker = new System.Threading.ReaderWriterLockSlim();
 
         public static void Add(string name, int minutes, Action onTick)
@@ -3711,11 +3718,8 @@ namespace Library
             {
                 Items.Add(new Schedule() { Name = name, Count = 0, Index = 0, Minutes = minutes, OnTick = onTick });
 
-                if (Timer != null)
-                    return;
-
-                Timer = new System.Timers.Timer(60000);
-                Timer.Elapsed += (o, e) =>
+                handle = new System.Threading.AutoResetEvent(false);
+                System.Threading.ThreadPool.RegisterWaitForSingleObject(handle, (state, timeout) =>
                 {
                     foreach (var j in Items)
                     {
@@ -3737,9 +3741,8 @@ namespace Library
                             j.LastError = Ex;
                         }
                     }
-                };
+                }, null, TimeSpan.FromMinutes(1), false);
 
-                Timer.Start();
             }
             finally
             {
@@ -3789,12 +3792,11 @@ namespace Library
             {
                 Items.Clear();
 
-                if (Timer == null)
+                if (handle == null)
                     return;
 
-                Timer.Stop();
-                Timer.Dispose();
-                Timer = null;
+                handle.Close();
+                handle = null;
             }
             finally
             {
@@ -5061,317 +5063,4 @@ namespace Library
     }
     #endregion
 
-    // ===============================================================================================
-    // 
-    // Library.[Online]
-    // 
-    // ===============================================================================================
-
-    // ===============================================================================================
-    // Autor        : Peter Širka
-    // Created      : 04. 05. 2008
-    // Updated      : 01. 02. 2014
-    // Description  : Online stats
-    // ===============================================================================================
-
-    #region Online
-    public class Analytics
-    {
-        private const string COOKIE = "__po";
-
-        public class Statistics
-        {
-            public int Day { get; set; }
-            public int Month { get; set; }
-            public int Year { get; set; }
-
-            public int Hits { get; set; }
-            public int Unique { get; set; }
-            public int Count { get; set; }
-
-            public int Search { get; set; }
-            public int Direct { get; set; }
-            public int Social { get; set; }
-            public int Unknown { get; set; }
-            public int Advert { get; set; }
-
-            public int Mobile { get; set; }
-            public int Desktop { get; set; }
-        }
-
-        public class OnlineIp
-        {
-            public string Ip { get; set; }
-            public string Url { get; set; }
-
-            public OnlineIp(string ip, string url)
-            {
-                Ip = ip;
-                Url = url;
-            }
-        }
-
-        public Analytics(bool allowXhr = false, bool allowIp = true)
-        {
-            Load();
-
-            Timer = new System.Timers.Timer(30000);
-            Timer.Elapsed += (o, e) => { Service(); };
-            Timer.Start();
-            AllowIp = allowIp;
-            AllowXhr = allowXhr;
-
-            if (allowIp)
-                Ip = new List<OnlineIp>(10);
-        }
-
-        public int Online { get; set; }
-        public DateTime LastVisit { get; set; }
-        public Statistics Stats { get; set; }
-
-        private System.Timers.Timer Timer = null;
-        private long Ticks { get; set; }
-        private int Last { get; set; }
-        private int Interval { get; set; }
-
-        private int[] Generation = new int[2] { 0, 0 };
-
-        private Regex reg_robot = new Regex("bot|crawler", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-        private Regex reg_mobile = new Regex("Android|webOS|iPhone|iPad|iPod|BlackBerry|Windows.?Phone", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-        private string[] ArrSocial = new string[] { "plus.url.google", "plus.google", "twitter", "facebook", "linkedin", "tumblr", "flickr", "instagram" };
-        private string[] ArrSearch = new string[] { "google", "bing", "yahoo" };
-
-        public Func<HttpRequest, bool> onValid { get; set; }
-        public List<OnlineIp> Ip { get; set; }
-
-        public bool AllowXhr { get; set; }
-        public bool AllowIp { get; set; }
-
-        public void Add(HttpRequest req, HttpResponse res)
-        {
-            if (req.HttpMethod != "GET")
-                return;
-
-            if (req.UserLanguages == null || req.UserLanguages.Length == 0)
-                return;
-
-            if (req.AcceptTypes == null || req.AcceptTypes.Length == 0)
-                return;
-
-            var ua = req.UserAgent;
-
-            if (ua.IsEmpty())
-                return;
-
-            if (req.Headers["X-moz"] == "prefetch")
-                return;
-
-            if (reg_robot.IsMatch(ua))
-                return;
-
-            if (!AllowXhr && req.Headers["X-Requested-With"] == "XMLHttpRequest")
-                return;
-
-            if (onValid != null && !onValid(req))
-                return;
-
-            long user = 0;
-
-            var cookie = req.Cookies[COOKIE];
-            var now = DateTime.Now;
-            var ticks = now.Ticks;
-
-            if (cookie != null)
-                user = cookie.Value.To<long>();
-
-            var sum = user == 0 ? 1000 : (ticks - user) / TimeSpan.TicksPerSecond;
-            var exists = sum < 31;
-            var referer = req.UrlReferrer.Host;
-
-            Stats.Hits++;
-            Change(req);
-
-            if (exists)
-                return;
-
-            var isUnique = false;
-
-            if (user > 0)
-            {
-                sum = Math.Abs(this.Ticks - user) / TimeSpan.TicksPerSecond;
-                if (sum < 41)
-                    return;
-
-                var date = new DateTime(user);
-                if (date.Day != now.Day && date.Month != now.Month && date.Year != now.Year)
-                    isUnique = true;
-            }
-            else
-                isUnique = true;
-
-            if (isUnique)
-            {
-                Stats.Unique++;
-                if (reg_mobile.IsMatch(ua))
-                    Stats.Mobile++;
-                else
-                    Stats.Desktop++;
-            }
-
-            Generation[1]++;
-            res.Cookies.Set(new HttpCookie(COOKIE, ticks.ToString()) { Expires = now.AddDays(5) });
-
-            if (AllowIp)
-                Ip.Add(new OnlineIp(req.UserHostAddress, req.RawUrl));
-
-            if (Last != Online)
-            {
-                if (AllowIp)
-                {
-                    var count = Ip.Count - Math.Abs(Last - Online);
-                    if (count <= 0)
-                        Ip.Clear();
-                    else
-                        Ip = Ip.Take(count).ToList();
-                }
-                Last = Online;
-            }
-
-            Stats.Count++;
-
-            if (req.QueryString["utm_medium"].IsNotEmpty() || req.QueryString["utm_source"].IsNotEmpty())
-            {
-                Stats.Advert++;
-                return;
-            }
-
-            if (referer.IsEmpty())
-            {
-                Stats.Direct++;
-                return;
-            }
-
-            for (var i = 0; i < ArrSocial.Length; i++)
-            {
-                if (referer.Contains(ArrSocial[i]))
-                {
-                    Stats.Social++;
-                    return;
-                }
-            }
-
-            for (var i = 0; i < ArrSearch.Length; i++)
-            {
-                if (referer.Contains(ArrSearch[i]))
-                {
-                    Stats.Search++;
-                    return;
-                }
-            }
-
-            Stats.Unknown++;
-        }
-
-        private void Service()
-        {
-            Interval++;
-
-            var now = DateTime.Now;
-            Ticks = now.Ticks;
-
-            if (Stats.Day != now.Day && Stats.Month != now.Month && Stats.Year != now.Year)
-            {
-                if (Stats.Day != 0)
-                {
-                    Append();
-                    Stats.Advert = 0;
-                    Stats.Count = 0;
-                    Stats.Desktop = 0;
-                    Stats.Direct = 0;
-                    Stats.Hits = 0;
-                    Stats.Mobile = 0;
-                    Stats.Search = 0;
-                    Stats.Social = 0;
-                    Stats.Unique = 0;
-                    Stats.Unknown = 0;
-                }
-
-                Stats.Day = now.Day;
-                Stats.Month = now.Month;
-                Stats.Year = now.Year;
-                Save();
-            }
-            else if (Interval % 2 == 0)
-                Save();
-
-            var tmp0 = Generation[0];
-            var tmp1 = Generation[1];
-
-            Generation[1] = 0;
-            Generation[0] = tmp1;
-
-            if (tmp0 != Generation[0] || tmp1 != Generation[1])
-            {
-                var online = Generation[0] + Generation[1];
-                if (online != Last)
-                {
-                    if (AllowIp)
-                    {
-                        var count = Ip.Count - tmp0;
-                        if (count <= 0)
-                            Ip.Clear();
-                        else
-                            Ip = Ip.Take(count).ToList();
-                    }
-
-                    Last = online;
-                }
-            }
-        }
-
-        private void Append()
-        {
-            System.IO.File.AppendAllText("online.json".PathData(), Stats.JsonSerialize() + "\n");
-        }
-
-        private void Save()
-        {
-            System.IO.File.WriteAllText("online-state.json".PathData(), Stats.JsonSerialize());
-        }
-
-        private void Load()
-        {
-            var filename = "online-state.json".PathData();
-            if (!System.IO.File.Exists(filename))
-                return;
-
-            Stats = System.IO.File.ReadAllText(filename).JsonDeserialize<Statistics>();
-        }
-
-        private void Change(HttpRequest req)
-        {
-            var referer = req.UrlReferrer.ToString();
-            if (referer.IsEmpty())
-                return;
-
-            if (!AllowIp)
-                return;
-
-            var item = Ip.FirstOrDefault(n => n.Ip == req.UserHostAddress && n.Url == referer);
-            if (item == null)
-                return;
-
-            item.Url = req.Url.ToString();
-        }
-
-        public List<Statistics> GetStatistics()
-        {
-            var filename = "online.json".PathData();
-            if (!System.IO.File.Exists(filename))
-                return new List<Statistics>(0);
-            return System.IO.File.ReadAllText(filename).JsonDeserialize<List<Statistics>>();
-        }
-    }
-    #endregion
 }

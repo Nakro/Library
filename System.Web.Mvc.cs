@@ -22,19 +22,48 @@ namespace System.Web.Mvc
     {
         private const string HEAD = "$head";
 
-        public static void Title(this HtmlHelper source, string value)
+        public static string Title(this HtmlHelper source, string value = null)
         {
+            if (value == null)
+                return source.ViewData["Title"] as string;
+
             source.ViewData["Title"] = value;
+            return "";
         }
 
-        public static void Description(this HtmlHelper source, string value)
+        public static string Description(this HtmlHelper source, string value = null)
         {
+            if (value == null)
+                return source.ViewData["Description"] as string;
+
             source.ViewData["Description"] = value;
+            return "";
         }
 
-        public static void Keywords(this HtmlHelper source, string value)
+        public static string Keywords(this HtmlHelper source, string value = null)
         {
+            if (value == null)
+                return source.ViewData["Keywords"] as string;
+
             source.ViewData["Keywords"] = value;
+            return "";
+        }
+
+        public static string Social(this HtmlHelper source, string value = null)
+        {
+            if (value == null)
+                return source.ViewData["social"] as string;
+
+            var url = Library.Configuration.Url.Image;
+
+            if (!(url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase)))
+            {
+                var uri = source.ViewContext.HttpContext.Request.Url;
+                url = string.Format("{0}://{1}/{2}/", uri.Scheme, uri.Host, url);
+            }
+
+            source.ViewData["Social"] = url + Library.Configuration.OnVersion(value);
+            return "";
         }
 
         public static HtmlString RenderMeta(this HtmlHelper source, string plus = "")
@@ -62,7 +91,12 @@ namespace System.Web.Mvc
         public static HtmlString RenderHead(this HtmlHelper source)
         {
             var value = HttpContext.Current.Items[HEAD] as string;
-            return new HtmlString(value == null ? "" : value);
+
+            if (value == null)
+                value = "";
+
+            value = "<meta name=\"author\" content=\"{0}\" />".format(Utils.Config("author"));
+            return new HtmlString(value);
         }
 
         public static HtmlString Raw(this string source, bool allowTags = true)
@@ -73,7 +107,7 @@ namespace System.Web.Mvc
             return new HtmlString(source);
         }
 
-        public static void DNS(this HtmlHelper source, params string[] url)
+        public static void Dns(this HtmlHelper source, params string[] url)
         {
             var str = "";
 
@@ -434,20 +468,22 @@ namespace System.Web.Mvc
             return new HtmlString(isDisabled ? " disabled=\"disabled\"" : "");
         }
 
-        public static HtmlString MetaTags(this HtmlHelper source, string description = null, string keywords = null)
+        public static void Meta(this HtmlHelper source, string title, string description = null, string keywords = null, string image = null)
         {
-            var output = "";
+            if (title.IsNotEmpty())
+                Title(source, title);
 
-            if (!string.IsNullOrEmpty(description))
-                output += string.Format("<meta name=\"description\" content=\"{0}\" />", description.HtmlEncode());
+            if (description.IsNotEmpty())
+                Description(source, description);
 
-            if (!string.IsNullOrEmpty(keywords))
-                output += string.Format("<meta name=\"keywords\" content=\"{0}\" />", keywords.HtmlEncode());
+            if (keywords.IsNotEmpty())
+                Keywords(source, keywords);
 
-            return new HtmlString(output);
+            if (image.IsNotEmpty())
+                Social(source, image);
         }
 
-        public static HtmlString CSS(this HtmlHelper source, string url = "default.css")
+        public static HtmlString Css(this HtmlHelper source, string url = "default.css")
         {
             var format = "<link type=\"text/css\" rel=\"stylesheet\" href=\"{0}\" />";
 
@@ -457,7 +493,7 @@ namespace System.Web.Mvc
             return new HtmlString(string.Format(format, Library.Configuration.Url.CSS + Library.Configuration.OnVersion(url)));
         }
 
-        public static HtmlString JS(this HtmlHelper source, string url = "default.js")
+        public static HtmlString Js(this HtmlHelper source, string url = "default.js")
         {
             var format = "<script type=\"text/javascript\" src=\"{0}\"></script>";
 
@@ -469,12 +505,29 @@ namespace System.Web.Mvc
 
         public static HtmlString Image(this HtmlHelper source, string url, int width = 0, int height = 0, string alt = "", string cls = "")
         {
-            var format = "<img src=\"{0}\" border=\"0\" width=\"{1}\" height=\"{2}\" alt=\"{3}\" class=\"{4}\" />";
+            var sb = new System.Text.StringBuilder();
+
+            sb.Append("<img");
 
             if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
-                return new HtmlString(string.Format(format, url, width, height, alt, cls));
+                sb.AppendAttribute("src", url);
+            else
+                sb.AppendAttribute("src", Library.Configuration.Url.Image + Library.Configuration.OnVersion(url));
 
-            return new HtmlString(string.Format(format, Library.Configuration.Url.Image + Library.Configuration.OnVersion(url)));
+            sb.AppendAttribute("border", 0);
+
+            if (width > 0)
+                sb.AppendAttribute("width", width);
+
+            if (height > 0)
+                sb.AppendAttribute("height", height);
+
+            sb.AppendAttribute("alt", alt);
+
+            if (cls.IsNotEmpty())
+                sb.AppendAttribute("class", cls);
+
+            return new HtmlString(sb.ToString());
         }
 
         public static HtmlString Favicon(this HtmlHelper source, string url = "favicon.ico")
@@ -491,7 +544,7 @@ namespace System.Web.Mvc
             if (url[0] != '/')
                 url = '/' + url;
 
-            return new HtmlString(string.Format(format, "/" + url, type));
+            return new HtmlString(string.Format(format, url, type));
         }
 
         public static HtmlString Download(this HtmlHelper source, string name, string content, string downloadName = "", string className = "")

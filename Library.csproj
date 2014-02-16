@@ -57,9 +57,9 @@
     <Compile Include="Library.cs" />
     <Compile Include="Library.Database.cs" />
     <Compile Include="Library.Database.Utils.cs" />
-    <Compile Include="Library.Handler.cs" />
+    <Compile Include="Library.Handlers.cs" />
     <Compile Include="Library.Json.cs" />
-    <Compile Include="Library.Module.cs" />
+    <Compile Include="Library.Modules.cs" />
     <Compile Include="Library.Mvc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="System.Web.Mvc.cs" />
