@@ -1473,6 +1473,21 @@ namespace Library
             return source.Replace(text, "");
         }
 
+        public static bool IsImage(this HttpPostedFile source)
+        {
+            return source.ContentType.StartsWith("image/", StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        public static bool IsAudio(this HttpPostedFile source)
+        {
+            return source.ContentType.StartsWith("audio/", StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        public static bool IsVideo(this HttpPostedFile source)
+        {
+            return source.ContentType.StartsWith("video/", StringComparison.InvariantCultureIgnoreCase);
+        }
+
         public static string JsCompress(this string source, System.Text.Encoding encoding = null)
         {
             if (string.IsNullOrEmpty(source))
@@ -4097,6 +4112,287 @@ namespace Library
 
     #region Markdown
     public class Markdown
+    {
+
+        public enum MarkdownListType : byte
+        {
+            plus = 0,
+            minus = 1,
+            x = 2
+        }
+
+        public enum MarkdownBreakType : byte
+        {
+            newline = 0,
+            line = 1,
+            page = 2
+        }
+
+        public enum MarkdownParagraphType : byte
+        {
+            gt = 0,
+            slash = 1,
+            comment = 2,
+            line = 3
+        }
+
+        public enum MarkdownTitleType : byte
+        {
+            h1 = 0,
+            h2 = 1,
+            h3 = 2,
+            h4 = 5,
+            h5 = 6
+        }
+
+        public enum MarkdownKeywordType : byte
+        {
+            composite = 0,
+            square = 1
+        }
+
+        public enum MarkdownFormatType : byte
+        {
+            b = 0,
+            strong = 1,
+            i = 2,
+            em = 3
+        }
+
+        private enum MarkdownParserType : byte
+        {
+            empty = 0,
+            paragraph = 100,
+            embedded = 101,
+            list = 102,
+            keyvalue = 103
+        }
+
+        public class MarkdownList
+        {
+            public MarkdownListType Type { get; set; }
+            public string Value { get; set; }
+
+            public MarkdownList(MarkdownListType type, string value)
+            {
+                Type = type;
+                Value = value;
+            }
+        }
+
+        public delegate string EmbeddedDelegate(string type, IList<string> lines);
+        public delegate string KeywordDelegate(MarkdownKeywordType type);
+        public delegate string ParagraphDelegate(MarkdownParagraphType type, IList<string> lines);
+        public delegate string LineDelegate(string line);
+        public delegate string FormatDelegate(MarkdownFormatType type, string value);
+        public delegate string LinkDelegate(string text, string url);
+        public delegate string ImageDelegate(string alt, string src, int width, int height, string url);
+        public delegate string ListDelegate(IList<MarkdownList> items);
+        public delegate string KeyValueDelegate(IList<KeyValue> items);
+        public delegate string BreakDelegate(MarkdownBreakType type);
+
+        public string Embedded { get; set; }
+        public BreakDelegate OnBreak { get; set; }
+
+        private bool skip = false;
+        private string id = "";
+        private string command = "";
+        private MarkdownParserType status = MarkdownParserType.empty;
+
+        private List<string> current = new List<string>(5);
+        private List<MarkdownList> currentList = null;
+        private List<KeyValue> currentKeyValue = null;
+
+        private string output = "";
+
+        public Markdown()
+        {
+            Embedded = "===";
+        }
+
+        public string Compile(string text, string id = "")
+        {
+            var arr = text.Split('\n');
+            var length = arr.Length;
+
+            this.id = id;
+            skip = false;
+
+            for (var i = 0; i < arr.Length; i++)
+            {
+                if (skip)
+                {
+                    skip = false;
+                    continue;
+                }
+
+                var line = arr[i];
+
+                if (ParseEmbedded(line))
+                    continue;
+
+                if (ParseBreak(line))
+                    continue;
+
+            }
+
+            return "";
+        }
+
+        private void Flush()
+        {
+
+        }
+
+        private bool ParseEmbedded(string line)
+        {
+            var chars = Embedded + (status != MarkdownParserType.embedded ? " " : "");
+            var has = line.Substring(0, chars.Length) == chars;
+
+            if (status != MarkdownParserType.embedded && !has)
+                return false;
+
+            if (status != MarkdownParserType.embedded && has)
+                Flush();
+
+            if (status == MarkdownParserType.embedded && has)
+            {
+                Flush();
+                status = MarkdownParserType.empty;
+                return true;
+            }
+
+            if (has)
+            {
+                status = MarkdownParserType.embedded;
+                command = line.Substring(chars.Length);
+                return true;
+            }
+
+            if (status == MarkdownParserType.embedded)
+                current.Add(line);
+
+            return true;
+        }
+
+        private bool ParseBreak(string line)
+        {
+            if (!(line == "" || line == "***" || line == "---"))
+                return false;
+
+            if (status != MarkdownParserType.empty)
+                Flush();
+
+            status = MarkdownParserType.empty;
+            MarkdownBreakType type = MarkdownBreakType.newline;
+
+            switch (line)
+            {
+                case "***":
+                    type = MarkdownBreakType.page;
+                    break;
+                case "---":
+                    type = MarkdownBreakType.line;
+                    break;
+            }
+
+            if (OnBreak != null)
+                output += OnBreak(type);
+
+            return true;
+        }
+
+        private bool ParseList(string line)
+        {
+            var first = line[0];
+            var second = line[1];
+            var has = (first == '-' || first == '+' || first == 'x') && (second == ' ');
+
+            if (!has)
+                return false;
+
+            if (status != MarkdownParserType.list)
+            {
+                Flush();
+                status = MarkdownParserType.list;
+            }
+
+            if (currentList == null)
+                currentList = new List<MarkdownList>(5);
+
+            MarkdownListType type = MarkdownListType.x;
+
+            switch (first)
+            {
+                case '-':
+                    type = MarkdownListType.minus;
+                    break;
+                case '+':
+                    type = MarkdownListType.plus;
+                    break;
+            }
+
+            currentList.Add(new MarkdownList(type, ParseOther(line.Substring(2))));
+            return true;
+        }
+
+        private bool ParseKeyValue(string line)
+        {
+            var index = line.IndexOf(':');
+            if (index == -1)
+                return false;
+
+            var tmp = line.Substring(0, index);
+            var length = tmp.Length;
+
+            var countTab = 0;
+            var countSpace = 0;
+
+            for (var i = 0; i < length; i++)
+            {
+                var c = tmp[i];
+                if (c == '\t')
+                {
+                    countTab++;
+                    break;
+                }
+
+                if (c == ' ')
+                {
+                    countSpace++;
+                    if (countSpace > 2)
+                        break;
+                }
+                else
+                    countSpace = 0;
+            }
+
+            if (countSpace < 3 && countTab <= 0)
+                return false;
+
+            if (status != MarkdownParserType.keyvalue)
+            {
+                Flush();
+                status = MarkdownParserType.keyvalue;
+            }
+
+            if (currentKeyValue == null)
+                currentKeyValue = new List<KeyValue>(3);
+
+            currentKeyValue.Add(new KeyValue(ParseOther(tmp.Trim()), ParseOther(line.Substring(index + 1).Trim())));
+            return true;
+        }
+
+        private string ParseOther(string line)
+        {
+            // 
+            return line;
+        }
+
+    }
+
+
+    public class MarkdownOLD
     {
         public class Table
         {

@@ -564,7 +564,7 @@ namespace Library.Modules
                     else
                         less.Name = less.Value.Trim();
 
-                    if (less.Name.Contains(false, "@import", "@font-face", "@keyframes", "@-moz-keyframes", "@-webkit-keyframes", "@-o-keyframes", "@-ms-keyframes", "@media"))
+                    if (less.Name.Contains(false, "@import", "@font-face", "@keyframes", "@-moz-keyframes", "@-webkit-keyframes", "@-o-keyframes", "@-ms-keyframes", "@media", "@charset"))
                         less.IsProblem = true;
 
                     return less;
