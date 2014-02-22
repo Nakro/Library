@@ -1285,6 +1285,15 @@ namespace Library
     #region Extension
     public static class Extension
     {
+        public static void Each<T>(this T[] source, Action<T> on)
+        {
+            if (source == null || source.Length == 0)
+                return;
+
+            for (var i = 0; i < source.Length; i++)
+                on(source[i]);
+        }
+
         public static bool ContainsKeys<K, V>(this Dictionary<K, V> source, bool allMustExist, params K[] key)
         {
             foreach (var m in key)
