@@ -14,6 +14,7 @@
 - added: (fn) controller.Problem(Log)
 - added: (fn) controller.Error(error)
 - added: (fn) controller.Proxy(key, url, [data], [method])
+- added: (fn) controller.mail(type, view, model, Action<MailMessage>)
 - added: new attribute for actions [Form]
 - added: new attribute for actions [Proxy]
 - added: uploaded File.IsImage()
