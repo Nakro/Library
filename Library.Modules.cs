@@ -693,8 +693,12 @@ namespace Library.Modules
             var id = "@#auto-vendor-prefix#@";
 
             if (value.IndexOf(id) == -1)
-                return value;
-
+            {
+                id = "/*auto*/";
+                if (value.IndexOf(id) == -1)
+                    return value;
+            }
+            
             value = Autoprefixer_keyframes(value.Replace(id, ""));
 
             var builder = new List<KeyValue>(10);
