@@ -900,7 +900,6 @@ namespace Library.Modules
 
             applicationStarted = true;
 
-            Utils.Log("MODULE INIT");
             //Load();
 
             AllowIp = Utils.Config<bool>("analytics.ip");
@@ -1116,7 +1115,6 @@ namespace Library.Modules
         private void Service(object sender, System.Timers.ElapsedEventArgs e)
         {
             Interval++;
-            Utils.Log("TIMER", Interval);
             try
             {
                 var now = DateTime.Now;
@@ -1170,7 +1168,6 @@ namespace Library.Modules
             }
             catch (Exception ex)
             {
-                Utils.Log("SERVICE", ex.ToString());
             }
         }
 

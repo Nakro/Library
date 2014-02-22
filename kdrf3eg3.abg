@@ -16,7 +16,7 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
 using System.Reflection;
-using Library.JsonSerializerDeserializer;
+using Library.Json;
 
 namespace Library
 {
@@ -113,7 +113,7 @@ namespace Library
         public KeyValue(string key, string format, params object[] param)
         {
             this.Key = key;
-            this.Value = string.Format(Configuration.InvariantCulture, format, param);
+            this.Value = string.Format(Application.InvariantCulture, format, param);
         }
 
         public static KeyValue Create(string key, string value)
@@ -138,7 +138,7 @@ namespace Library
 
         public static KeyValue Create(string key, string format, params object[] param)
         {
-            return new KeyValue(key, string.Format(Configuration.InvariantCulture, format, param));
+            return new KeyValue(key, string.Format(Application.InvariantCulture, format, param));
         }
     }
 
@@ -175,25 +175,13 @@ namespace Library
         public string Static { get; set; }
     }
 
-    public class Configuration
+    public class Application
     {
         public delegate void ProblemEventHandler(string source, string message, Uri uri);
         public delegate void ErrorEventHandler(string source, Exception ex, Uri uri);
         public delegate void ChangeEventHandler(string source, string message, Uri uri);
         public delegate void LogEventHandler(string source, string message, Uri uri);
-        public delegate Authorization AuthorizationDelegate(HttpContextBase context, string roles, string users);
-        public delegate ActionResult AuthorizationErrorDelegate(HttpRequestBase request, Authorization authorization);
-        public delegate string VersionDelegate(string name);
-        public delegate string DateConjugationDelegate(DateTime current, string language);
-        public delegate string ResourceDelegate(string language, string key);
-        public delegate string EncryptDelegate(int id, string token);
-        public delegate int DecryptDelegate(string hash, string token);
-        public delegate Size ImageParserDimensionDelegate(string dimension);
-        public delegate string ImageParserUrlDelegate(string dimension, ImageParser parser);
-        public delegate string JsonSerializeDelegate(object obj);
-        public delegate object JsonDeserializeDelegate(string value);
 
-        // Events
         public static event ProblemEventHandler Problem;
         public static event ErrorEventHandler Error;
         public static event ChangeEventHandler Change;
@@ -208,23 +196,19 @@ namespace Library
 
         public static string PathTemporary { get; set; }
 
-        public static bool AllowLogs { get; set; }
-        public static bool AllowProblems { get; set; }
-        public static bool AllowChanges { get; set; }
-        public static bool AllowErrors { get; set; }
+        public static int DefaultCacheExpireMinutes { get; set; }
 
-        // Delegates
-        public static DateConjugationDelegate OnDateConjugation { get; set; }
-        public static VersionDelegate OnVersion { get; set; }
-        public static ResourceDelegate OnResource { get; set; }
-        public static EncryptDelegate OnEncrypt { get; set; }
-        public static DecryptDelegate OnDecrypt { get; set; }
-        public static ImageParserDimensionDelegate OnImageParserDimension { get; set; }
-        public static ImageParserUrlDelegate OnImageParserUrl { get; set; }
-        public static AuthorizationDelegate OnAuthorization { get; set; }
-        public static AuthorizationErrorDelegate OnAuthorizationError { get; set; }
+        public static Func<DateTime, string, string> OnDateConjugation { get; set; }
 
-        public static Json JsonSerializer { get; set; }
+        public static Func<string, string> OnVersion { get; set; }
+        public static Func<string, string, string> OnResource { get; set; }
+
+        public static Func<int, string, string> OnEncrypt { get; set; }
+        public static Func<string, string, int> OnDecrypt { get; set; }
+
+        public static Func<string, Size> OnImageParserDimension { get; set; }
+        public static Func<string, ImageParser, string> OnImageParserUrl { get; set; }
+
         public static bool JsonUnicode { get; set; }
 
         public static bool IsDebug
@@ -237,34 +221,39 @@ namespace Library
             get { return !HttpContext.Current.IsDebuggingEnabled; }
         }
 
+        /// <summary>
+        /// HttpContext, Roles, Users
+        /// </summary>
+        public static Func<HttpContextBase, string, string, Authorization> OnAuthorization { get; set; }
+        public static Func<HttpRequestBase, Authorization, ActionResult> OnAuthorizationError { get; set; }
+
+        public static Library.Modules.Analytics Analytics
+        {
+            get { return HttpContext.Current.ApplicationInstance.Modules["Analytics"] as Library.Modules.Analytics; }
+        }
+
         public static void Defaults()
         {
             AreaRegistration.RegisterAllAreas();
             GlobalFilters.Filters.Add(new HandleErrorAttribute());
 
-            Configuration.JsonSerializer = new Json();
-            Configuration.Url = new ConfigurationUrl();
+            Application.Url = new ConfigurationUrl();
 
-            Configuration.AllowLogs = true;
-            Configuration.AllowProblems = true;
-            Configuration.AllowErrors = true;
-            Configuration.AllowChanges = true;
+            Application.Url.CSS = "/css/";
+            Application.Url.JS = "/js/";
+            Application.Url.Image = "/img/";
+            Application.Url.Download = "/download/";
+            Application.Url.Static = "";
 
-            Configuration.Url.CSS = "/css/";
-            Configuration.Url.JS = "/js/";
-            Configuration.Url.Image = "/img/";
-            Configuration.Url.Download = "/download/";
-            Configuration.Url.Static = "";
+            Application.PathTemporary = "~/App_Data/tmp/";
+            Application.JsonUnicode = false;
+            Application.Name = Utils.Config("name");
+            Application.Author = Utils.Config("author");
+            Application.Version = Utils.Config("version");
 
-            Configuration.PathTemporary = "~/App_Data/tmp/";
-            Configuration.JsonUnicode = false;
-            Configuration.Name = Utils.Config("name");
-            Configuration.Author = Utils.Config("author");
-            Configuration.Version = Utils.Config("version");
+            Application.OnImageParserUrl = (dimension, image) => Application.Url.Static + Application.OnVersion(string.Format("/images/{0}/{1}.jpg", dimension, image.Id));
 
-            Configuration.OnImageParserUrl = (dimension, image) => Configuration.Url.Static + Configuration.OnVersion(string.Format("/images/{0}/{1}.jpg", dimension, image.Id));
-
-            Configuration.OnDecrypt = (hash, token) =>
+            Application.OnDecrypt = (hash, token) =>
             {
                 if (string.IsNullOrEmpty(token))
                     token = "Library.110";
@@ -285,7 +274,7 @@ namespace Library
                 return id;
             };
 
-            Configuration.OnEncrypt = (id, token) =>
+            Application.OnEncrypt = (id, token) =>
             {
                 if (string.IsNullOrEmpty(token))
                     token = "Library.110";
@@ -293,7 +282,7 @@ namespace Library
                 return EncryptDecrypt.Encrypt(token, Utils.Token(id, token, false));
             };
 
-            Configuration.OnDateConjugation = (source, language) =>
+            Application.OnDateConjugation = (source, language) =>
             {
                 var date = DateTime.Now;
                 var ts = date - source;
@@ -358,44 +347,32 @@ namespace Library
                 return "pred " + Math.Round(ts.Days / 365D) + " rokmi";
             };
 
-            if (Configuration.OnVersion == null)
-                Configuration.OnVersion = n => n;
+            if (Application.OnVersion == null)
+                Application.OnVersion = n => n;
 
             MvcHandler.DisableMvcResponseHeader = true;
         }
 
         public static void InvokeProblem(string source, string message, Uri uri)
         {
-            if (!AllowProblems)
-                return;
-
             if (Problem != null)
                 Problem(source, message, uri);
         }
 
         public static void InvokeError(string source, Exception error, Uri uri)
         {
-            if (!AllowErrors)
-                return;
-
             if (Error != null)
                 Error(source, error, uri);
         }
 
         public static void InvokeChange(string source, string message, Uri uri)
         {
-            if (!AllowChanges)
-                return;
-
             if (Change != null)
                 Change(source, message, uri);
         }
 
         public static void InvokeLog(string source, string message, Uri uri)
         {
-            if (!AllowLogs)
-                return;
-
             if (Log != null)
                 Log(source, message, uri);
         }
@@ -488,22 +465,22 @@ namespace Library
 
         public static void Problem(string source, string message, Uri uri)
         {
-            Configuration.InvokeProblem(source, message, uri);
+            Application.InvokeProblem(source, message, uri);
         }
 
         public static void Error(string source, Exception error, Uri uri)
         {
-            Configuration.InvokeError(source, error, uri);
+            Application.InvokeError(source, error, uri);
         }
 
         public static void Change(string source, string message, Uri uri)
         {
-            Configuration.InvokeChange(source, message, uri);
+            Application.InvokeChange(source, message, uri);
         }
 
         public static void Log(string source, string message, Uri uri)
         {
-            Configuration.InvokeLog(source, message, uri);
+            Application.InvokeLog(source, message, uri);
         }
 
         public static void Compare<T>(IList<T> sourceForm, IList<T> sourceDB, Func<T, T, bool> predicate, Action<T> onAdd, Action<T, T> onUpdate, Action<T> onRemove, bool isNew = false)
@@ -637,12 +614,12 @@ namespace Library
 
         public static string Version(string name)
         {
-            return Configuration.OnVersion(name);
+            return Application.OnVersion(name);
         }
 
         public static string Resource(string name, string language = "")
         {
-            return Configuration.OnResource(name, language);
+            return Application.OnResource(name, language);
         }
 
         public static IList<KeyValue> Validate(object source, bool allProperties = false)
@@ -784,7 +761,7 @@ namespace Library
                     {
                         try
                         {
-                            o = Decimal.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Configuration.InvariantCulture);
+                            o = Decimal.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Application.InvariantCulture);
                         }
                         catch { o = 0M; }
                     }
@@ -865,7 +842,7 @@ namespace Library
                     {
                         try
                         {
-                            o = float.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Configuration.InvariantCulture);
+                            o = float.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Application.InvariantCulture);
                         }
                         catch { o = 0F; }
                     }
@@ -892,7 +869,7 @@ namespace Library
                     {
                         try
                         {
-                            o = double.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Configuration.InvariantCulture);
+                            o = double.Parse(value.ToString().Replace(',', '.').Replace(" ", ""), Application.InvariantCulture);
                         }
                         catch { o = 0D; }
                     }
@@ -1066,14 +1043,14 @@ namespace Library
             var current = System.Web.HttpContext.Current;
 
             if (session)
-                return string.Format("{0}X|{1}|{2}|{3}|{4}", id, current.Request.Browser.Browser, string.IsNullOrEmpty(Configuration.Name) ? current.Request.Url.Host.Replace("www.", "") : Configuration.Name, current.Request.UserHostAddress, token);
+                return string.Format("{0}X|{1}|{2}|{3}|{4}", id, current.Request.Browser.Browser, string.IsNullOrEmpty(Application.Name) ? current.Request.Url.Host.Replace("www.", "") : Application.Name, current.Request.UserHostAddress, token);
 
-            return string.Format("{0}X{1}#A0Z9#{0}#{2}", id, string.IsNullOrEmpty(Configuration.Name) ? current.Request.Url.Host.Replace("www.", "") : Configuration.Name, token);
+            return string.Format("{0}X{1}#A0Z9#{0}#{2}", id, string.IsNullOrEmpty(Application.Name) ? current.Request.Url.Host.Replace("www.", "") : Application.Name, token);
         }
 
         public static string CookieEncode(int id, string token = "")
         {
-            return EncryptDecrypt.Encrypt(string.IsNullOrEmpty(token) ? Configuration.Name : token, Token(id, token, true));
+            return EncryptDecrypt.Encrypt(string.IsNullOrEmpty(token) ? Application.Name : token, Token(id, token, true));
         }
 
         public static int CookieDecode(string value, string token = "")
@@ -1081,7 +1058,7 @@ namespace Library
             if (value.IsEmpty())
                 return 0;
 
-            var hash = EncryptDecrypt.Decrypt(string.IsNullOrEmpty(token) ? Configuration.Name : token, value);
+            var hash = EncryptDecrypt.Decrypt(string.IsNullOrEmpty(token) ? Application.Name : token, value);
             if (hash.IsEmpty())
                 return 0;
 
@@ -1177,7 +1154,7 @@ namespace Library
             foreach (var m in value)
                 format += (format.Length > 0 ? " " : "") + "{" + (index++) + "}";
 
-            System.IO.File.AppendAllText(filename.PathData(), string.Format(Configuration.InvariantCulture, format, value) + Environment.NewLine);
+            System.IO.File.AppendAllText(filename.PathData(), string.Format(Application.InvariantCulture, format, value) + Environment.NewLine);
         }
 
         public static void LogResponse(params object[] value)
@@ -1191,7 +1168,7 @@ namespace Library
             var response = HttpContext.Current.Response;
             var end = response.ContentType == "text/html" ? "<br />" : Environment.NewLine;
 
-            response.Write(string.Format(Configuration.InvariantCulture, format, value) + end);
+            response.Write(string.Format(Application.InvariantCulture, format, value) + end);
             response.Flush();
         }
 
@@ -1252,12 +1229,12 @@ namespace Library
 
         public static int IdDecrypt(string hash, string token = "")
         {
-            return Configuration.OnDecrypt(hash, token);
+            return Application.OnDecrypt(hash, token);
         }
 
         public static string IdEncrypt(int id, string token = "")
         {
-            return Configuration.OnEncrypt(id, token);
+            return Application.OnEncrypt(id, token);
         }
 
         public static string UnicodeDecode(string s)
@@ -1436,19 +1413,19 @@ namespace Library
 
                 if (propSource.PropertyType == typeof(decimal))
                 {
-                    property.SetValue(target, ((decimal)value).ToString(Configuration.InvariantCulture), null);
+                    property.SetValue(target, ((decimal)value).ToString(Application.InvariantCulture), null);
                     continue;
                 }
 
                 if (propSource.PropertyType == typeof(float))
                 {
-                    property.SetValue(target, ((float)value).ToString(Configuration.InvariantCulture), null);
+                    property.SetValue(target, ((float)value).ToString(Application.InvariantCulture), null);
                     continue;
                 }
 
                 if (propSource.PropertyType == typeof(double))
                 {
-                    property.SetValue(target, ((double)value).ToString(Configuration.InvariantCulture), null);
+                    property.SetValue(target, ((double)value).ToString(Application.InvariantCulture), null);
                     continue;
                 }
             }
@@ -1551,7 +1528,7 @@ namespace Library
                 using (var src = new System.IO.MemoryStream(encoding.GetBytes(source)))
                     output = js.Minify(src).Replace('\n', ' ');
 
-                if (Configuration.IsRelease)
+                if (Application.IsRelease)
                     return Utils.CacheWrite<string>(key, output, DateTime.Now.AddMinutes(5));
 
                 return output;
@@ -1572,7 +1549,7 @@ namespace Library
             {
                 var output = Modules.Less.Compile(source);
 
-                if (Configuration.IsRelease)
+                if (Application.IsRelease)
                     return Utils.CacheWrite<string>(key, output, DateTime.Now.AddMinutes(5));
 
                 return output;
@@ -1634,7 +1611,7 @@ namespace Library
             var sum = 0;
             foreach (var m in source)
                 sum += Utils.Asc(m);
-            return sum.ToString() + ":" + Configuration.Version;
+            return sum.ToString() + ":" + Application.Version;
         }
 
         public static string Template(this string source, params KeyValue[] param)
@@ -1682,28 +1659,28 @@ namespace Library
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeProblem(source, message, controller.Request.Url);
+            Application.InvokeProblem(source, message, controller.Request.Url);
         }
 
         public static void Change(this Controller controller, string message, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeChange(source, message, controller.Request.Url);
+            Application.InvokeChange(source, message, controller.Request.Url);
         }
 
         public static void Log(this Controller controller, string message, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeLog(source, message, controller.Request.Url);
+            Application.InvokeLog(source, message, controller.Request.Url);
         }
 
         public static void Error(this Controller controller, Exception error, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeError(source, error, controller.Request.Url);
+            Application.InvokeError(source, error, controller.Request.Url);
         }
 
         public static HtmlString RenderToHtmlString(this Controller source, string name, object model)
@@ -1762,8 +1739,8 @@ namespace Library
 
         public static ActionResult JsonError(this KeyValue source, string language = "", Func<string, string, string> onReplace = null)
         {
-            if (Configuration.OnResource != null && source.Value.IsNotEmpty() && source.Value[0] == '@')
-                source.Value = Configuration.OnResource(source.Value == "@" ? source.Key : source.Value.Substring(1), language);
+            if (Application.OnResource != null && source.Value.IsNotEmpty() && source.Value[0] == '@')
+                source.Value = Application.OnResource(source.Value == "@" ? source.Key : source.Value.Substring(1), language);
 
             if (onReplace != null)
                 source.Value = onReplace(source.Key, source.Value);
@@ -1775,8 +1752,8 @@ namespace Library
         {
             foreach (var m in source)
             {
-                if (Configuration.OnResource != null && m.Value.IsNotEmpty() && m.Value[0] == '@')
-                    m.Value = Configuration.OnResource(m.Value == "@" ? m.Key : m.Value.Substring(1), language);
+                if (Application.OnResource != null && m.Value.IsNotEmpty() && m.Value[0] == '@')
+                    m.Value = Application.OnResource(m.Value == "@" ? m.Key : m.Value.Substring(1), language);
 
                 if (onReplace != null)
                     m.Value = onReplace(m.Key, m.Value);
@@ -1789,8 +1766,8 @@ namespace Library
         {
             foreach (var m in source)
             {
-                if (Configuration.OnResource != null && m.Value.IsNotEmpty() && m.Value[0] == '@')
-                    m.Value = Configuration.OnResource(m.Value == "@" ? m.Key : m.Value.Substring(1), language);
+                if (Application.OnResource != null && m.Value.IsNotEmpty() && m.Value[0] == '@')
+                    m.Value = Application.OnResource(m.Value == "@" ? m.Key : m.Value.Substring(1), language);
 
                 if (onResource != null)
                     m.Value = onResource(m.Key, m.Value);
@@ -1816,8 +1793,8 @@ namespace Library
                             if (string.IsNullOrEmpty(message))
                                 message = "@";
 
-                            if (Configuration.OnResource != null && message[0] == '@')
-                                message = Configuration.OnResource(message == "@" ? k : message.Substring(1), language);
+                            if (Application.OnResource != null && message[0] == '@')
+                                message = Application.OnResource(message == "@" ? k : message.Substring(1), language);
 
                             if (onReplace != null)
                                 message = onReplace(k, message);
@@ -1832,8 +1809,8 @@ namespace Library
                         if (string.IsNullOrEmpty(message))
                             message = "@";
 
-                        if (Configuration.OnResource != null && message[0] == '@')
-                            message = Configuration.OnResource(message == "@" ? k : message.Substring(1), language);
+                        if (Application.OnResource != null && message[0] == '@')
+                            message = Application.OnResource(message == "@" ? k : message.Substring(1), language);
 
                         if (onReplace != null)
                             message = onReplace(k, message);
@@ -1961,7 +1938,7 @@ namespace Library
 
         public static string Trim(this decimal source, int scale = 2, bool allowFormat = true, bool allowZero = false, bool fillZero = false)
         {
-            var value = allowFormat ? source.Format(2) : source.ToString(Configuration.InvariantCulture);
+            var value = allowFormat ? source.Format(2) : source.ToString(Application.InvariantCulture);
 
             var index = value.IndexOf('.');
             if (index == 0 || index == -1)
@@ -2220,7 +2197,7 @@ namespace Library
             if (url == "/")
                 url = "";
 
-            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, new { controller = controller, action = action });
+            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).MD5(), url, new { controller = controller, action = action });
         }
 
         public static void Route(this RouteCollection source, string url, object defaults)
@@ -2228,7 +2205,7 @@ namespace Library
             var t = defaults.GetType();
             var controller = t.GetProperty("controller").GetValue(defaults, null).ToString();
             var action = t.GetProperty("action").GetValue(defaults, null).ToString();
-            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, defaults);
+            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).MD5(), url, defaults);
         }
 
         public static ContentResult Json(this object source, string contentType = "application/json", bool toUnicode = false)
@@ -2238,7 +2215,7 @@ namespace Library
             content.ContentType = contentType;
             content.ContentEncoding = System.Text.Encoding.UTF8;
 
-            // Solved: problem with Safari
+            // safari resolve
             HttpContext.Current.Response.Cache.SetCacheability(HttpCacheability.NoCache);
 
             return content;
@@ -2266,6 +2243,18 @@ namespace Library
         public static string Host(this HttpRequestBase source, string url = "")
         {
             return string.Format("{0}://{1}{2}", source.Url.Scheme, source.Url.Host, url);
+        }
+
+        public static string MD5(this string source, Encoding encoding = null)
+        {
+            using (var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider())
+            {
+                if (encoding == null)
+                    encoding = Encoding.UTF8;
+
+                var data = encoding.GetBytes(source);
+                return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+            }
         }
 
         public static string Hash(this string source, string type, string salt = "", Encoding encoding = null)
@@ -2326,27 +2315,27 @@ namespace Library
 
         public static int IdDecrypt(string hash, string token = "")
         {
-            return Configuration.OnDecrypt(hash, token);
+            return Application.OnDecrypt(hash, token);
         }
 
         public static string IdEncrypt(int id, string token = "")
         {
-            return Configuration.OnEncrypt(id, token);
+            return Application.OnEncrypt(id, token);
         }
 
         public static string JsonSerialize(this object source)
         {
-            return Configuration.JsonSerializer.Serialize(source);
+            return Library.Json.JsonSerializer.SerializeObject(source);
         }
 
         public static T JsonDeserialize<T>(this string source)
         {
-            return Configuration.JsonSerializer.DeserializeObject<T>(source);
+            return Library.Json.JsonSerializer.DeSerializeObject<T>(source);
         }
 
         public static dynamic JsonDeserialize(this string source)
-        {           
-            return Configuration.JsonSerializer.DeserializeObject(source);
+        {
+            return Library.Json.JsonSerializer.DeSerializeObject(source);
         }
 
         public static string Path(this string source, char path = '/')
@@ -2372,7 +2361,7 @@ namespace Library
 
         public static string PathTemporary(this string source)
         {
-            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Configuration.PathTemporary, source);
+            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Application.PathTemporary, source);
         }
 
         public static string PathData(this string source)
@@ -2392,7 +2381,7 @@ namespace Library
 
         public static string Conjugation(this DateTime source, string language = "")
         {
-            return Configuration.OnDateConjugation(source, language);
+            return Application.OnDateConjugation(source, language);
         }
 
         public static T PropertyEach<T>(this T source, Action<T, PropertyInfo> onProperty)
@@ -2459,7 +2448,7 @@ namespace Library
 
         public static string format(this string source, params object[] args)
         {
-            return string.Format(Configuration.InvariantCulture, source, args);
+            return string.Format(Application.InvariantCulture, source, args);
         }
 
         public static bool Contains(this string source, params string[] value)
@@ -2735,10 +2724,10 @@ namespace Library
             switch (value.Substring(end).ToLower())
             {
                 case ".js":
-                    value = "<script type=\"text/javascript\" src=\"{0}\"></script>".format((isOut ? String.Empty : Configuration.Url.JS) + value);
+                    value = "<script type=\"text/javascript\" src=\"{0}\"></script>".format((isOut ? String.Empty : Application.Url.JS) + value);
                     break;
                 case ".css":
-                    value = "<link type=\"text/css\" rel=\"stylesheet\" href=\"{0}\" />".format((isOut ? String.Empty : Configuration.Url.CSS) + value);
+                    value = "<link type=\"text/css\" rel=\"stylesheet\" href=\"{0}\" />".format((isOut ? String.Empty : Application.Url.CSS) + value);
                     break;
             }
 
@@ -3813,12 +3802,12 @@ namespace Library
 
         public string ToUrl()
         {
-            return Configuration.OnImageParserUrl(this.Dimension, this);
+            return Application.OnImageParserUrl(this.Dimension, this);
         }
 
         public string ToUrl(string dimension)
         {
-            return Configuration.OnImageParserUrl(dimension, this);
+            return Application.OnImageParserUrl(dimension, this);
         }
 
         public static ImageParser Load(string id, string dimension = "")
@@ -3834,10 +3823,10 @@ namespace Library
             if (string.IsNullOrEmpty(dimension))
                 return image;
 
-            if (Configuration.OnImageParserDimension == null)
+            if (Application.OnImageParserDimension == null)
                 return image;
 
-            var size = Configuration.OnImageParserDimension(dimension);
+            var size = Application.OnImageParserDimension(dimension);
             if (size.IsEmpty)
                 return image;
 
@@ -3853,10 +3842,10 @@ namespace Library
             image.Id = id;
             image.Dimension = dimension;
 
-            if (Configuration.OnImageParserDimension == null)
+            if (Application.OnImageParserDimension == null)
                 return image;
 
-            var size = Configuration.OnImageParserDimension(dimension);
+            var size = Application.OnImageParserDimension(dimension);
             if (size.IsEmpty)
                 return image;
 
@@ -3867,19 +3856,19 @@ namespace Library
 
         public static Size LoadDimension(string dimension)
         {
-            if (Configuration.OnImageParserDimension == null)
+            if (Application.OnImageParserDimension == null)
                 return default(Size);
-            return Configuration.OnImageParserDimension(dimension);
+            return Application.OnImageParserDimension(dimension);
         }
 
         public ImageParser Resize(string dimension)
         {
             this.Dimension = dimension;
 
-            if (Configuration.OnImageParserDimension == null)
+            if (Application.OnImageParserDimension == null)
                 return this;
 
-            var size = Configuration.OnImageParserDimension(dimension);
+            var size = Application.OnImageParserDimension(dimension);
             if (size.IsEmpty)
                 return this;
 
@@ -3895,7 +3884,7 @@ namespace Library
 
         public string Render(string className = "")
         {
-            return string.Format("<img src=\"{0}\"{1}{2} alt=\"{3}\" border=\"0\"{4} />", Configuration.OnImageParserUrl(this.Dimension, this), Width > 0 ? string.Format(" width=\"{0}\"", Width) : "", Height > 0 ? string.Format(" height=\"{0}\"", Height) : "", Name, string.IsNullOrEmpty(className) ? "" : string.Format(" class=\"{0}\"", className));
+            return string.Format("<img src=\"{0}\"{1}{2} alt=\"{3}\" border=\"0\"{4} />", Application.OnImageParserUrl(this.Dimension, this), Width > 0 ? string.Format(" width=\"{0}\"", Width) : "", Height > 0 ? string.Format(" height=\"{0}\"", Height) : "", Name, string.IsNullOrEmpty(className) ? "" : string.Format(" class=\"{0}\"", className));
         }
     }
     #endregion
@@ -5438,7 +5427,7 @@ namespace Library
 
             public string Path
             {
-                get { return Configuration.PathTemporary + Id + ".filecache"; }
+                get { return Application.PathTemporary + Id + ".filecache"; }
             }
         }
 
@@ -5568,39 +5557,6 @@ namespace Library
             {
                 return Items().OrderBy(n => n.Priority);
             }
-        }
-    }
-    #endregion
-
-    // ===============================================================================================
-    // 
-    // Library.[Json]
-    // 
-    // ===============================================================================================
-
-    // ===============================================================================================
-    // Autor        : Peter Širka
-    // Created      : 22. 02. 2014
-    // Updated      : 22. 02. 2014
-    // Description  : Json methods for override
-    // ===============================================================================================
-
-    #region Json
-    public class Json
-    {
-        public virtual string Serialize(object value, params string[] withoutProperty)
-        {
-            return Library.JsonSerializerDeserializer.JsonSerializer.SerializeObject(value);
-        }
-
-        public virtual T DeserializeObject<T>(string value)
-        {
-            return Library.JsonSerializerDeserializer.JsonSerializer.DeserializeObject<T>(value);
-        }
-
-        public virtual dynamic DeserializeObject(string value)
-        {
-            return Library.JsonSerializerDeserializer.JsonSerializer.DeserializeObject(value);
         }
     }
     #endregion

@@ -9,7 +9,7 @@ using System.Linq;
 
 using Library;
 
-namespace Library.Json
+namespace Library.JsonSerializerDeserializer
 {
     public class JsonSerializer
     {
@@ -205,7 +205,7 @@ namespace Library.Json
             }
         }
 
-        public static T DeSerializeObject<T>(string json)
+        public static T DeserializeObject<T>(string json)
         {
             try
             {
@@ -218,7 +218,7 @@ namespace Library.Json
             }
         }
 
-        public static dynamic DeSerializeObject(string json)
+        public static dynamic DeserializeObject(string json)
         {
             try
             {
