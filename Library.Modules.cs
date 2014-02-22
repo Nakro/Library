@@ -900,11 +900,8 @@ namespace Library.Modules
 
             applicationStarted = true;
 
-            Utils.Log("MODULE KOKOT");
-            Load();
-
-            //Handle = new System.Threading.AutoResetEvent(true);
-            //System.Threading.ThreadPool.RegisterWaitForSingleObject(Handle, (state, timeout) => Service(), null, TimeSpan.FromSeconds(30), false);
+            Utils.Log("MODULE INIT");
+            //Load();
 
             AllowIp = Utils.Config<bool>("analytics.ip");
             AllowXhr = Utils.Config<bool>("analytics.xhr");
@@ -912,8 +909,10 @@ namespace Library.Modules
             if (AllowIp)
                 Ip = new List<OnlineIp>(10);
 
+            /*
             app.BeginRequest += (sender, e) =>
             {
+
                 var url = app.Request.RawUrl;
                 var beg = url.LastIndexOf('.');
 
@@ -923,12 +922,20 @@ namespace Library.Modules
                         return;
                 }
 
-                Add(app.Context.Request, app.Context.Response);
-            };
+                try
+                {
+                    Add(app.Context.Request, app.Context.Response);
+                }
+                catch (Exception ex)
+                {
+                    Utils.Log("REQUEST", ex.ToString());
+                }
+            };*/
 
             Timer = new System.Timers.Timer(30000);
             Timer.Enabled = true;
             Timer.Elapsed += new System.Timers.ElapsedEventHandler(Service);
+
         }
 
         public int Online
@@ -938,6 +945,7 @@ namespace Library.Modules
 
         public DateTime LastVisit { get; set; }
         public Statistics Stats { get; set; }
+        public HttpApplication App { get; set; }
 
         private bool allowIP = true;
         private long Ticks { get; set; }

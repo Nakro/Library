@@ -270,6 +270,13 @@ namespace System.Web.Mvc
             return new HtmlString(sb.ToString());
         }
 
+        public static HtmlString Json(this HtmlHelper htmlHelper, object model, string id = "")
+        {
+            if (id.IsEmpty())
+                return new HtmlString(model.JsonSerialize());
+            return new HtmlString("<script type=\"application/json\" id=\"{1}\">{0}</script>".format(model.JsonSerialize(), id));
+        }
+
         public static HtmlString InputCheckbox(this HtmlHelper htmlHelper, string name, string label, bool required = false, bool disabled = false)
         {
             return Input(htmlHelper, "checkbox", name, "", 0, required, disabled, true, label);

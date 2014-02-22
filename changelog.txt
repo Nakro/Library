@@ -1,0 +1,17 @@
+﻿IN DEVELOPMENT ======== 11.1.0
+
+- added: (event) Configuration.Change
+- added: (event) Configuration.Problem
+- added: (event) Configuration.Error
+- added: (fn) Utils.Change(message, source, uri);
+- added: (fn) Utils.Problem(message, source, uri);
+- added: (fn) Utils.Error(error, source, uri);
+- added: (fn) Utils.Proxy(key, url, [data], [method]);
+- added: (fn) controller.Change(message);
+- added: (fn) controller.Problem(message);
+- added: (fn) controller.Error(error);
+- added: (fn) controller.Proxy(key, url, [data], [method]);
+- added: new attribute for actions [Form]
+- added: new attribute for actions [Proxy]
+
+- updated: ImageConverter (supports stream)

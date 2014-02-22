@@ -65,6 +65,7 @@
     <Compile Include="System.Web.Mvc.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="changelog.txt" />
     <Content Include="icon.ico" />
     <Content Include="license.txt" />
   </ItemGroup>

@@ -73,7 +73,7 @@ namespace Library
     {
         public CheckedAttribute()
             : base("You must agree.")
-        {}
+        { }
 
         public override bool IsValid(object value)
         {
@@ -261,6 +261,95 @@ namespace Library
             HttpCachePolicyBase cachePolicy = filterContext.HttpContext.Response.Cache;
             cachePolicy.SetProxyMaxAge(new TimeSpan(0));
             cachePolicy.AddValidationCallback(CacheValidateHandler, null);
+        }
+    }
+    #endregion
+
+    #region Proxy Attribute
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public class ProxyAttribute : ActionFilterAttribute
+    {
+        [DefaultValue(404)]
+        public int HttpStatus { get; set; }
+        public string Key { get; set; }
+        public string Method { get; set; }
+
+        public ProxyAttribute() { }
+
+        public ProxyAttribute(string key, string method = "POST", int httpStatus = 404)
+        {
+            this.Key = "Library." + key.Hash("sha256");
+            this.Method = "POST";
+            this.HttpStatus = httpStatus;
+        }
+
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            var request = filterContext.HttpContext.Request;
+
+            if (request.HttpMethod != this.Method || request.Headers["X-Proxy"] != this.Key)
+                filterContext.Result = new HttpStatusCodeResult(HttpStatus);
+
+            base.OnActionExecuting(filterContext);
+        }
+    }
+    #endregion
+
+    #region Form Attribute
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public class FormAttribute : ActionFilterAttribute
+    {
+        public bool HostValid { get; set; }
+        public bool Json { get; set; }
+        public int HttpStatus { get; set; }
+
+        public FormAttribute()
+        {
+            this.HostValid = true;
+            this.HttpStatus = 403;
+            this.Json = true;
+        }
+
+        public FormAttribute(bool hostValid = true, int httpStatus = 401, bool Json = true)
+        {
+            this.HostValid = hostValid;
+            this.HttpStatus = httpStatus;
+            this.Json = Json;
+        }
+
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            var request = filterContext.HttpContext.Request;
+
+            if (request.IsAjaxRequest() == false)
+            {
+                filterContext.Result = new HttpStatusCodeResult(HttpStatus);
+                base.OnActionExecuting(filterContext);
+                return;
+            }
+
+            if (Json)
+            {
+                if (request.ContentType.StartsWith("application/json") == false)
+                {
+                    filterContext.Result = new HttpStatusCodeResult(HttpStatus);
+                    base.OnActionExecuting(filterContext);
+                    return;
+                }
+            }
+
+            if (HostValid)
+            {
+                var referrer = filterContext.HttpContext.Request.UrlReferrer;
+                if (referrer == null || referrer.Host != filterContext.HttpContext.Request.Url.Host)
+                {
+                    filterContext.Result = new HttpStatusCodeResult(HttpStatus);
+                    base.OnActionExecuting(filterContext);
+                    return;
+                }
+            }
+
+            base.OnActionExecuting(filterContext);
         }
     }
     #endregion

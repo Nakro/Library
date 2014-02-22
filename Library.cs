@@ -161,7 +161,7 @@ namespace Library
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 04. 05. 2008
-    // Updated      : 11. 05. 2013
+    // Updated      : 22. 02. 2014
     // Description  : App configuration
     // ===============================================================================================
 
@@ -177,8 +177,16 @@ namespace Library
 
     public class Configuration
     {
+        public delegate void ProblemEventHandler(string source, string message, Uri uri);
+        public delegate void ErrorEventHandler(string source, Exception ex, Uri uri);
+        public delegate void ChangeEventHandler(string source, string message, Uri uri);
+
         public static readonly CultureInfo InvariantCulture = CultureInfo.InvariantCulture;
         public static ConfigurationUrl Url { get; set; }
+
+        public static event ProblemEventHandler Problem;
+        public static event ErrorEventHandler Error;
+        public static event ChangeEventHandler Change;
 
         public static string Name { get; set; }
         public static string Author { get; set; }
@@ -246,7 +254,7 @@ namespace Library
             Configuration.OnDecrypt = (hash, token) =>
             {
                 if (string.IsNullOrEmpty(token))
-                    token = "Library.100";
+                    token = "Library.110";
 
                 var value = EncryptDecrypt.Decrypt(token, hash);
                 if (value.IsEmpty())
@@ -267,7 +275,7 @@ namespace Library
             Configuration.OnEncrypt = (id, token) =>
             {
                 if (string.IsNullOrEmpty(token))
-                    token = "Library.100";
+                    token = "Library.110";
 
                 return EncryptDecrypt.Encrypt(token, Utils.Token(id, token, false));
             };
@@ -341,6 +349,24 @@ namespace Library
                 Configuration.OnVersion = n => n;
 
             MvcHandler.DisableMvcResponseHeader = true;
+        }
+
+        public static void InvokeProblem(string source, string message, Uri uri)
+        {
+            if (Problem != null)
+                Problem(source, message, uri);
+        }
+
+        public static void InvokeError(string source, Exception error, Uri uri)
+        {
+            if (Error != null)
+                Error(source, error, uri);
+        }
+
+        public static void InvokeChange(string source, string message, Uri uri)
+        {
+            if (Change != null)
+                Change(source, message, uri);
         }
     }
     #endregion
@@ -427,6 +453,21 @@ namespace Library
             fn(action);
 
             response.Write("</urlset>");
+        }
+
+        public static void Problem(string source, string message, Uri uri)
+        {
+            Configuration.InvokeProblem(source, message, uri);
+        }
+
+        public static void Error(string source, Exception error, Uri uri)
+        {
+            Configuration.InvokeError(source, error, uri);
+        }
+
+        public static void Change(string source, string message, Uri uri)
+        {
+            Configuration.InvokeChange(source, message, uri);
         }
 
         public static void Compare<T>(IList<T> sourceForm, IList<T> sourceDB, Func<T, T, bool> predicate, Action<T> onAdd, Action<T, T> onUpdate, Action<T> onRemove, bool isNew = false)
@@ -926,6 +967,31 @@ namespace Library
                 if (l.Count > 0)
                     onTake(l);
             }
+        }
+
+        public static T Proxy<T>(string key, string url, StringBuilder data = null, string method = "POST")
+        {
+            System.Net.HttpWebRequest request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+
+            if (method != "GET" || method != "DELETE" || method != "OPTION")
+                request.ContentType = "application/x-www-form-urlencoded";
+
+            request.Method = method;
+            request.Headers.Add("X-Proxy", "Library." + key.Hash("sha256"));
+
+            if (data != null && data.Length > 0)
+            {
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(request.GetRequestStream(), System.Text.Encoding.UTF8);
+                if (data != null && data.Length > 0)
+                    writer.Write(data.ToString());
+                writer.Flush();
+                writer.Close();
+            }
+
+            var response = request.GetResponse();
+
+            using (System.IO.StreamReader Reader = new System.IO.StreamReader(response.GetResponseStream(), System.Text.Encoding.UTF8))
+                return Reader.ReadToEnd().JsonDeserialize<T>();
         }
 
         public static string POST(string url, Action<Dictionary<string, string>> fnData, Action<System.Net.HttpWebRequest> options = null, System.Text.Encoding encoding = null)
@@ -1466,7 +1532,7 @@ namespace Library
             if (string.IsNullOrEmpty(source))
                 return false; ;
 
-            if (source.Length == 1)
+            if (source.Length <= 1)
                 return false;
 
             var a = source[0];
@@ -1552,6 +1618,27 @@ namespace Library
             }
         }
 
+        public static void Problem(this Controller controller, string message, string source = null)
+        {
+            if (source == null)
+                source = controller.GetType().Name;
+            Configuration.InvokeProblem(source, message, controller.Request.Url);
+        }
+
+        public static void Change(this Controller controller, string message, string source = null)
+        {
+            if (source == null)
+                source = controller.GetType().Name;
+            Configuration.InvokeChange(source, message, controller.Request.Url);
+        }
+
+        public static void Error(this Controller controller, Exception error, string source = null)
+        {
+            if (source == null)
+                source = controller.GetType().Name;
+            Configuration.InvokeError(source, error, controller.Request.Url);
+        }
+
         public static HtmlString RenderToHtmlString(this Controller source, string name, object model)
         {
             return new HtmlString(source.RenderToString(name, model));
@@ -1561,7 +1648,6 @@ namespace Library
         {
             return Utils.CacheRead<ControllerCache>(key, k =>
             {
-
                 ControllerCache cache = null;
                 DateTime expiration = DateTime.Now.AddMinutes(3);
 
@@ -2127,16 +2213,60 @@ namespace Library
             }
         }
 
-        public static string SHA1(this string source, Encoding encoding = null)
+        public static string Hash(this string source, string type, string salt = "", Encoding encoding = null)
         {
-            using (var crypto = new System.Security.Cryptography.SHA1CryptoServiceProvider())
-            {
-                if (encoding == null)
-                    encoding = Encoding.UTF8;
+            if (string.IsNullOrEmpty(source))
+                return "";
 
-                var data = encoding.GetBytes(source);
-                return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+            if (type.Equals("sha1", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA1CryptoServiceProvider())
+                {
+                    if (encoding == null)
+                        encoding = Encoding.UTF8;
+
+                    var data = encoding.GetBytes(source + salt);
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                }
             }
+
+            if (type.Equals("sha256", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA256CryptoServiceProvider())
+                {
+                    if (encoding == null)
+                        encoding = Encoding.UTF8;
+
+                    var data = encoding.GetBytes(source + salt);
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                }
+            }
+
+            if (type.Equals("sha512", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA512CryptoServiceProvider())
+                {
+                    if (encoding == null)
+                        encoding = Encoding.UTF8;
+
+                    var data = encoding.GetBytes(source + salt);
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                }
+            }
+
+            if (type.Equals("md5", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider())
+                {
+                    if (encoding == null)
+                        encoding = Encoding.UTF8;
+
+                    var data = encoding.GetBytes(source + salt);
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                }
+            }
+
+            return EncryptDecrypt.Hash(source + salt);
         }
 
         public static int IdDecrypt(string hash, string token = "")
@@ -2574,6 +2704,11 @@ namespace Library
         {
             source.ViewData["Keywords"] = value;
         }
+
+        public static T Proxy<T>(this Controller source, string key, string url, StringBuilder data = null, string method = "POST")
+        {
+            return Utils.Proxy<T>(key, url, data, method);
+        }
     }
     #endregion
 
@@ -2678,6 +2813,22 @@ namespace Library
             }
         }
 
+        public void SaveToStream(System.IO.Stream stream, System.Drawing.Imaging.ImageFormat format)
+        {
+            using (var b = new Bitmap(BMP))
+                b.Save(stream, format);
+        }
+
+        public void SaveToStreamJpg(System.IO.Stream stream, uint quality)
+        {
+            System.Drawing.Imaging.EncoderParameter Param = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+            System.Drawing.Imaging.ImageCodecInfo jpegCodec = GetEncoderInfo("image/jpeg");
+            System.Drawing.Imaging.EncoderParameters encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
+            encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+            using (var b = new Bitmap(BMP))
+                b.Save(stream, jpegCodec, encoderParams);
+        }
+
         public System.Drawing.Color Pixel(int X, int Y)
         {
             return BMP.GetPixel(X, Y);
@@ -2708,6 +2859,11 @@ namespace Library
             IsLoaded = LoadFromUrl(url);
         }
 
+        public ImageConverter(System.IO.Stream stream)
+        {
+            IsLoaded = LoadFromStream(stream);
+        }
+
         public ImageConverter(System.Drawing.Image image)
         {
             BMP = new System.Drawing.Bitmap(image);
@@ -2732,6 +2888,23 @@ namespace Library
             try
             {
                 BMP = new System.Drawing.Bitmap(fileName);
+                BMP.SetResolution(80, 60);
+            }
+            catch
+            {
+                IsLoaded = false;
+                return false;
+            }
+
+            IsLoaded = true;
+            return true;
+        }
+
+        public bool LoadFromStream(System.IO.Stream stream)
+        {
+            try
+            {
+                BMP = new System.Drawing.Bitmap(stream);
                 BMP.SetResolution(80, 60);
             }
             catch
