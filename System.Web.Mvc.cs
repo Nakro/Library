@@ -564,6 +564,16 @@ namespace System.Web.Mvc
             Library.Sitemap.Add(name, url, priority);
         }
 
+        public static string Host(this UrlHelper source, string path = "/")
+        {
+            return source.RequestContext.HttpContext.Request.Host(path);
+        }
+
+        public static string Url(this UrlHelper source, bool host = true)
+        {
+            return source.RequestContext.HttpContext.Request.Url(host);
+        }
+
         public static string RouteStatic(this UrlHelper source, string url)
         {
             if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))

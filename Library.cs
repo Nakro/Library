@@ -192,6 +192,7 @@ namespace Library
         public delegate string ImageParserUrlDelegate(string dimension, ImageParser parser);
         public delegate string JsonSerializeDelegate(object obj);
         public delegate object JsonDeserializeDelegate(string value);
+        public delegate void MailHandler(string type, System.Net.Mail.MailMessage message);
 
         // Events
         public static event ProblemEventHandler Problem;
@@ -223,6 +224,7 @@ namespace Library
         public static ImageParserUrlDelegate OnImageParserUrl { get; set; }
         public static AuthorizationDelegate OnAuthorization { get; set; }
         public static AuthorizationErrorDelegate OnAuthorizationError { get; set; }
+        public static MailHandler OnMail { get; set; }
 
         public static Json JsonSerializer { get; set; }
         public static bool JsonUnicode { get; set; }
@@ -1314,13 +1316,29 @@ namespace Library
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 04. 05. 2008
-    // Updated      : 01. 02. 2014
+    // Updated      : 22. 02. 2014
     // Description  : Extension methods
     // ===============================================================================================
 
     #region Extension
     public static class Extension
     {
+        public static void Mail(this Controller source, string type, string name, object model, Action<System.Net.Mail.MailMessage> message)
+        {
+            using (var mail = new System.Net.Mail.MailMessage())
+            {
+                var body = System.Net.Mail.AlternateView.CreateAlternateViewFromString(source.RenderToString(name, model), null, "text/html");
+                mail.SubjectEncoding = System.Text.Encoding.UTF8;
+                mail.HeadersEncoding = System.Text.Encoding.UTF8;
+                mail.BodyEncoding = System.Text.Encoding.UTF8;
+                mail.AlternateViews.Add(body);
+                message(mail);
+                Configuration.OnMail(type, mail);
+                using (var smtp = new System.Net.Mail.SmtpClient())
+                    smtp.Send(mail);
+            }
+        }
+
         public static void Each<T>(this T[] source, Action<T> on)
         {
             if (source == null || source.Length == 0)
@@ -2345,7 +2363,7 @@ namespace Library
         }
 
         public static dynamic JsonDeserialize(this string source)
-        {           
+        {
             return Configuration.JsonSerializer.DeserializeObject(source);
         }
 
