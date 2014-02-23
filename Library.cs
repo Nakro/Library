@@ -16,12 +16,13 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
 using System.Reflection;
-using Library.JsonSerializerDeserializer;
+
+using Library.Json;
 
 namespace Library
 {
 
-    #region Enums & Attributes & Classes
+    #region Enums & Attributes & Classes & Interfaces
     public enum XmlSitemapFrequency
     {
         always,
@@ -82,9 +83,7 @@ namespace Library
         [JsonParameter(Name = "V")]
         public string Value { get; set; }
 
-        public KeyValue()
-        {
-        }
+        public KeyValue() { }
 
         public KeyValue(string key, string value)
         {
@@ -144,11 +143,27 @@ namespace Library
 
     public class ControllerCache
     {
+        public int Id { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
         public string Keywords { get; set; }
-        public int Tag { get; set; }
+        public string Image { get; set; }
         public HtmlString Body { get; set; }
+    }
+
+    public interface ILibraryJson
+    {
+        string Serialize(object value, params string[] withoutProperty);
+        T DeserializeObject<T>(string value);
+        dynamic DeserializeObject(string value);
+    }
+
+    public interface ILibraryCache
+    {
+        T Write<T>(string key, T value, DateTime expire);
+        T Read<T>(string key, Func<string, T> onEmpty = null);
+        void Remove(string key);
+        void Remove(Func<string, bool> predicate);
     }
     #endregion
 
@@ -226,7 +241,9 @@ namespace Library
         public static AuthorizationErrorDelegate OnAuthorizationError { get; set; }
         public static MailHandler OnMail { get; set; }
 
-        public static Json JsonSerializer { get; set; }
+        public static ILibraryJson Json { get; set; }
+        public static ILibraryCache Cache { get; set; }
+
         public static bool JsonUnicode { get; set; }
 
         public static bool IsDebug
@@ -244,7 +261,8 @@ namespace Library
             AreaRegistration.RegisterAllAreas();
             GlobalFilters.Filters.Add(new HandleErrorAttribute());
 
-            Configuration.JsonSerializer = new Json();
+            Configuration.Json = new DefaultJsonSerializerDeserializer();
+            Configuration.Cache = new DefaultCacheProvider();
             Configuration.Url = new ConfigurationUrl();
 
             Configuration.AllowLogs = true;
@@ -2354,17 +2372,17 @@ namespace Library
 
         public static string JsonSerialize(this object source)
         {
-            return Configuration.JsonSerializer.Serialize(source);
+            return Configuration.Json.Serialize(source);
         }
 
         public static T JsonDeserialize<T>(this string source)
         {
-            return Configuration.JsonSerializer.DeserializeObject<T>(source);
+            return Configuration.Json.DeserializeObject<T>(source);
         }
 
         public static dynamic JsonDeserialize(this string source)
         {
-            return Configuration.JsonSerializer.DeserializeObject(source);
+            return Configuration.Json.DeserializeObject(source);
         }
 
         public static string Path(this string source, char path = '/')
@@ -5592,33 +5610,54 @@ namespace Library
 
     // ===============================================================================================
     // 
-    // Library.[Json]
+    // Library.[DefaultCacheProvider]
     // 
     // ===============================================================================================
 
     // ===============================================================================================
     // Autor        : Peter Širka
-    // Created      : 22. 02. 2014
-    // Updated      : 22. 02. 2014
-    // Description  : Json methods for override
+    // Created      : 04. 05. 2008
+    // Updated      : 01. 02. 2014
+    // Description  : Default cache provider
     // ===============================================================================================
 
-    #region Json
-    public class Json
+    #region DefaultCacheProvider
+    internal class DefaultCacheProvider : ILibraryCache
     {
-        public virtual string Serialize(object value, params string[] withoutProperty)
+        public T Write<T>(string key, T value, DateTime expire)
         {
-            return Library.JsonSerializerDeserializer.JsonSerializer.SerializeObject(value);
+            var cache = HttpContext.Current.Cache;
+            cache.Remove(key);
+            cache.Add(key, value, null, expire, TimeSpan.Zero, System.Web.Caching.CacheItemPriority.Normal, null);
+            return value;
         }
 
-        public virtual T DeserializeObject<T>(string value)
+        public T Read<T>(string key, Func<string, T> onEmpty = null)
         {
-            return Library.JsonSerializerDeserializer.JsonSerializer.DeserializeObject<T>(value);
+            var value = HttpContext.Current.Cache[key];
+            if (value != null)
+                return (T)value;
+
+            if (onEmpty != null)
+                return onEmpty(key);
+
+            return default(T);
         }
 
-        public virtual dynamic DeserializeObject(string value)
+        public void Remove(string key)
         {
-            return Library.JsonSerializerDeserializer.JsonSerializer.DeserializeObject(value);
+            HttpContext.Current.Cache.Remove(key);
+        }
+
+        public void Remove(Func<string, bool> predicate)
+        {
+            var cache = HttpContext.Current.Cache;
+            foreach (System.Collections.DictionaryEntry item in cache)
+            {
+                var key = item.Key.ToString();
+                if (predicate(key))
+                    cache.Remove(key);
+            }
         }
     }
     #endregion

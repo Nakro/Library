@@ -4,6 +4,8 @@
 - added: (event) Configuration.Problem
 - added: (event) Configuration.Error
 - added: (event) Configuration.Log
+- added: Configuration.Cache (default cache provider)
+- added: Configuration.Json (default JSON serializer/deserializer provider)
 - added: (fn) Utils.Change(message, source, uri)
 - added: (fn) Utils.Problem(message, source, uri)
 - added: (fn) Utils.Log(message, source, uri)
