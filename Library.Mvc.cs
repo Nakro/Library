@@ -265,6 +265,50 @@ namespace Library
     }
     #endregion
 
+    #region User Attribute
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public class UserAttribute : AuthorizeAttribute
+    {
+        private Authorization authorization = Authorization.unlogged;
+
+        public UserAttribute() { }
+
+        public string ErrorMessage { get; set; }
+
+        protected override bool AuthorizeCore(HttpContextBase httpContext)
+        {
+            if (Configuration.OnAuthorization == null)
+                return false;
+
+            authorization = Configuration.OnAuthorization(httpContext, this.Roles, this.Users);
+            return authorization == Authorization.logged;
+        }
+
+        private void CacheValidateHandler(HttpContext context, object data, ref HttpValidationStatus validationStatus)
+        {
+            validationStatus = OnCacheAuthorization(new HttpContextWrapper(context));
+        }
+
+        protected override HttpValidationStatus OnCacheAuthorization(HttpContextBase httpContext)
+        {
+            return AuthorizeCore(httpContext) ? HttpValidationStatus.Valid : HttpValidationStatus.Invalid;
+        }
+
+        public override void OnAuthorization(AuthorizationContext filterContext)
+        {
+            if (!AuthorizeCore(filterContext.HttpContext))
+            {
+                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, this.authorization);
+                return;
+            }
+
+            HttpCachePolicyBase cachePolicy = filterContext.HttpContext.Response.Cache;
+            cachePolicy.SetProxyMaxAge(new TimeSpan(0));
+            cachePolicy.AddValidationCallback(CacheValidateHandler, null);
+        }
+    }
+    #endregion
+
     #region Proxy Attribute
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class ProxyAttribute : ActionFilterAttribute
@@ -350,6 +394,26 @@ namespace Library
             }
 
             base.OnActionExecuting(filterContext);
+        }
+    }
+    #endregion
+
+    // FOR CONTROLLERS
+
+    #region Analylitcs
+    public class Analytics : ActionFilterAttribute, IActionFilter
+    {
+        public bool AllowXhr { get; set; }
+
+        public Analytics(bool allowXhr = false)
+        {
+            AllowXhr = allowXhr;
+        }
+
+        void IActionFilter.OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            Configuration.Analytics.Request(filterContext.HttpContext, AllowXhr);
+            this.OnActionExecuting(filterContext);
         }
     }
     #endregion

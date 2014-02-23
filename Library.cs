@@ -151,19 +151,30 @@ namespace Library
         public HtmlString Body { get; set; }
     }
 
-    public interface ILibraryJson
+    public interface ILibraryJsonProvider
     {
         string Serialize(object value, params string[] withoutProperty);
         T DeserializeObject<T>(string value);
         dynamic DeserializeObject(string value);
     }
 
-    public interface ILibraryCache
+    public interface ILibraryCacheProvider
     {
         T Write<T>(string key, T value, DateTime expire);
         T Read<T>(string key, Func<string, T> onEmpty = null);
         void Remove(string key);
         void Remove(Func<string, bool> predicate);
+    }
+
+    public interface ILibraryAnalyticsProvider
+    {
+        void Write(Library.Others.Analytics.Statistics stats);
+        void WriteState(Library.Others.Analytics.Statistics stats);
+        Library.Others.Analytics.Statistics LoadState();
+
+        IList<Library.Others.Analytics.Statistics> Yearly();
+        IList<Library.Others.Analytics.Statistics> Monthly(int year);
+        IList<Library.Others.Analytics.Statistics> Daily(int year, int month);
     }
     #endregion
 
@@ -176,7 +187,7 @@ namespace Library
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 04. 05. 2008
-    // Updated      : 22. 02. 2014
+    // Updated      : 23. 02. 2014
     // Description  : App configuration
     // ===============================================================================================
 
@@ -241,8 +252,11 @@ namespace Library
         public static AuthorizationErrorDelegate OnAuthorizationError { get; set; }
         public static MailHandler OnMail { get; set; }
 
-        public static ILibraryJson Json { get; set; }
-        public static ILibraryCache Cache { get; set; }
+        public static ILibraryJsonProvider JsonProvider { get; set; }
+        public static ILibraryCacheProvider CacheProvider { get; set; }
+        public static ILibraryAnalyticsProvider AnalyticsProvider { get; set; }
+
+        public static Library.Others.Analytics Analytics { get; set; }
 
         public static bool JsonUnicode { get; set; }
 
@@ -256,13 +270,14 @@ namespace Library
             get { return !HttpContext.Current.IsDebuggingEnabled; }
         }
 
-        public static void Defaults()
+        public static void Defaults(bool allowAnalytics = false)
         {
             AreaRegistration.RegisterAllAreas();
             GlobalFilters.Filters.Add(new HandleErrorAttribute());
 
-            Configuration.Json = new DefaultJsonSerializerDeserializer();
-            Configuration.Cache = new DefaultCacheProvider();
+            Configuration.JsonProvider = new Providers.DefaultJsonSerializerDeserializer();
+            Configuration.CacheProvider = new Providers.DefaultCacheProvider();
+            Configuration.AnalyticsProvider = new Providers.DefaultAnalyticsProvider();
             Configuration.Url = new ConfigurationUrl();
 
             Configuration.AllowLogs = true;
@@ -380,6 +395,9 @@ namespace Library
 
             if (Configuration.OnVersion == null)
                 Configuration.OnVersion = n => n;
+
+            if (allowAnalytics)
+                Analytics = new Library.Others.Analytics();
 
             MvcHandler.DisableMvcResponseHeader = true;
         }
@@ -1119,38 +1137,22 @@ namespace Library
 
         public static T CacheWrite<T>(string key, T value, DateTime expire)
         {
-            var cache = HttpContext.Current.Cache;
-            cache.Remove(key);
-            cache.Add(key, value, null, expire, TimeSpan.Zero, System.Web.Caching.CacheItemPriority.Normal, null);
-            return value;
+            return Configuration.CacheProvider.Write<T>(key, value, expire);
         }
 
         public static T CacheRead<T>(string key, Func<string, T> onEmpty = null)
         {
-            var value = HttpContext.Current.Cache[key];
-            if (value != null)
-                return (T)value;
-
-            if (onEmpty != null)
-                return onEmpty(key);
-
-            return default(T);
+            return Configuration.CacheProvider.Read<T>(key, onEmpty);
         }
 
         public static void CacheRemove(string key)
         {
-            HttpContext.Current.Cache.Remove(key);
+            Configuration.CacheProvider.Remove(key);
         }
 
         public static void CacheRemove(Func<string, bool> predicate)
         {
-            var cache = HttpContext.Current.Cache;
-            foreach (System.Collections.DictionaryEntry item in cache)
-            {
-                var key = item.Key.ToString();
-                if (predicate(key))
-                    cache.Remove(key);
-            }
+            Configuration.CacheProvider.Remove(predicate);
         }
 
         public static decimal Discount(int discount, decimal price, int decimals = 2)
@@ -1334,13 +1336,18 @@ namespace Library
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 04. 05. 2008
-    // Updated      : 22. 02. 2014
+    // Updated      : 23. 02. 2014
     // Description  : Extension methods
     // ===============================================================================================
 
     #region Extension
     public static class Extension
     {
+        public static Others.Analytics Analytics(this Controller source)
+        {
+            return Configuration.Analytics;
+        }
+
         public static void Mail(this Controller source, string type, string name, object model, Action<System.Net.Mail.MailMessage> message)
         {
             using (var mail = new System.Net.Mail.MailMessage())
@@ -2372,17 +2379,17 @@ namespace Library
 
         public static string JsonSerialize(this object source)
         {
-            return Configuration.Json.Serialize(source);
+            return Configuration.JsonProvider.Serialize(source);
         }
 
         public static T JsonDeserialize<T>(this string source)
         {
-            return Configuration.Json.DeserializeObject<T>(source);
+            return Configuration.JsonProvider.DeserializeObject<T>(source);
         }
 
         public static dynamic JsonDeserialize(this string source)
         {
-            return Configuration.Json.DeserializeObject(source);
+            return Configuration.JsonProvider.DeserializeObject(source);
         }
 
         public static string Path(this string source, char path = '/')
@@ -5603,60 +5610,6 @@ namespace Library
             get
             {
                 return Items().OrderBy(n => n.Priority);
-            }
-        }
-    }
-    #endregion
-
-    // ===============================================================================================
-    // 
-    // Library.[DefaultCacheProvider]
-    // 
-    // ===============================================================================================
-
-    // ===============================================================================================
-    // Autor        : Peter Širka
-    // Created      : 04. 05. 2008
-    // Updated      : 01. 02. 2014
-    // Description  : Default cache provider
-    // ===============================================================================================
-
-    #region DefaultCacheProvider
-    internal class DefaultCacheProvider : ILibraryCache
-    {
-        public T Write<T>(string key, T value, DateTime expire)
-        {
-            var cache = HttpContext.Current.Cache;
-            cache.Remove(key);
-            cache.Add(key, value, null, expire, TimeSpan.Zero, System.Web.Caching.CacheItemPriority.Normal, null);
-            return value;
-        }
-
-        public T Read<T>(string key, Func<string, T> onEmpty = null)
-        {
-            var value = HttpContext.Current.Cache[key];
-            if (value != null)
-                return (T)value;
-
-            if (onEmpty != null)
-                return onEmpty(key);
-
-            return default(T);
-        }
-
-        public void Remove(string key)
-        {
-            HttpContext.Current.Cache.Remove(key);
-        }
-
-        public void Remove(Func<string, bool> predicate)
-        {
-            var cache = HttpContext.Current.Cache;
-            foreach (System.Collections.DictionaryEntry item in cache)
-            {
-                var key = item.Key.ToString();
-                if (predicate(key))
-                    cache.Remove(key);
             }
         }
     }

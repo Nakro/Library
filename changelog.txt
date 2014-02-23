@@ -19,6 +19,7 @@
 - added: (fn) controller.mail(type, view, model, Action<MailMessage>)
 - added: new attribute for actions [Form]
 - added: new attribute for actions [Proxy]
+- added: new attribute for actions [User]
 - added: uploaded File.IsImage()
 - added: uploaded File.IsAudio()
 - added: uploaded File.IsVideo()

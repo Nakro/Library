@@ -1033,21 +1033,4 @@ namespace Library.Json
 
     }
 
-    public class DefaultJsonSerializerDeserializer : ILibraryJson
-    {
-        public virtual string Serialize(object value, params string[] withoutProperty)
-        {
-            return JsonSerializer.SerializeObject(value);
-        }
-
-        public virtual T DeserializeObject<T>(string value)
-        {
-            return JsonSerializer.DeserializeObject<T>(value);
-        }
-
-        public virtual dynamic DeserializeObject(string value)
-        {
-            return JsonSerializer.DeserializeObject(value);
-        }
-    }
 }

@@ -2,4 +2,3 @@ d:\github\Library\bin\Release\Library.dll
 d:\github\Library\bin\Release\Library.pdb
 d:\github\Library\obj\Release\Library.dll
 d:\github\Library\obj\Release\Library.pdb
-d:\github\Library\obj\Release\Library.csprojResolveAssemblyReference.cache
