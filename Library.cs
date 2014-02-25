@@ -1467,7 +1467,7 @@ namespace Library
 
                 if (propSource.PropertyType == ConfigurationCache.type_string)
                 {
-                    if (property.PropertyType == typeof(int))
+                    if (property.PropertyType == ConfigurationCache.type_int)
                     {
                         property.SetValue(target, value.To<int>(), null);
                         continue;
