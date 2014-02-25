@@ -50,6 +50,13 @@ namespace Library
         forbidden
     }
 
+    [Flags]
+    public enum ConfigurationDefaults
+    {
+        analytics,
+        cmd
+    }
+
     [AttributeUsage(AttributeTargets.Property)]
     public class JsonParameterAttribute : Attribute
     {
@@ -201,6 +208,47 @@ namespace Library
         public string Static { get; set; }
     }
 
+    public class ConfigurationCache
+    {
+        public static Type type_nodbparameter = typeof(Library.NoDbParameterAttribute);
+        public static Type type_dbskip = typeof(Library.DbSkipAttribute);
+        public static Type type_dbschema = typeof(Library.DbSchemaAttribute);
+        public static Type type_dbtable = typeof(Library.DbTableAttribute);
+        public static Type type_dbparameter = typeof(Library.DbParameterAttribute);
+        public static Type type_bool_null = typeof(bool?);
+        public static Type type_bool = typeof(bool);
+        public static Type type_int = typeof(int);
+        public static Type type_int_null = typeof(int?);
+        public static Type type_byte = typeof(byte);
+        public static Type type_byte_null = typeof(byte?);
+        public static Type type_short = typeof(short);
+        public static Type type_short_null = typeof(short?);
+        public static Type type_long = typeof(long);
+        public static Type type_long_null = typeof(long?);
+        public static Type type_string = typeof(string);
+        public static Type type_datetime = typeof(DateTime);
+        public static Type type_datetime_null = typeof(DateTime?);
+        public static Type type_decimal = typeof(decimal);
+        public static Type type_decimal_null = typeof(decimal?);
+        public static Type type_float = typeof(float);
+        public static Type type_float_null = typeof(float?);
+        public static Type type_double = typeof(double);
+        public static Type type_double_null = typeof(double?);
+        public static Type type_guid = typeof(Guid);
+        public static Type type_guid_null = typeof(Guid?);
+        public static Type type_char = typeof(Char);
+        public static Type type_char_null = typeof(Char?);
+        public static Type type_byte_array = typeof(byte[]);
+        public static Type type_uint = typeof(uint);
+        public static Type type_uint_null = typeof(uint?);
+        public static Type type_ushort = typeof(ushort);
+        public static Type type_ushort_null = typeof(ushort?);
+        public static Type type_ulong = typeof(ulong);
+        public static Type type_ulong_null = typeof(ulong?);
+        public static Type type_object = typeof(object);
+        public static Type type_nullable = typeof(Nullable);
+    }
+
     public class Configuration
     {
         public delegate void ProblemEventHandler(string source, string message, Uri uri);
@@ -270,10 +318,14 @@ namespace Library
             get { return !HttpContext.Current.IsDebuggingEnabled; }
         }
 
-        public static void Defaults(bool allowAnalytics = false)
+        public static void Defaults(ConfigurationDefaults defaults)
         {
-            AreaRegistration.RegisterAllAreas();
-            GlobalFilters.Filters.Add(new HandleErrorAttribute());
+            if ((defaults & ConfigurationDefaults.cmd) != ConfigurationDefaults.cmd)
+            {
+                AreaRegistration.RegisterAllAreas();
+                GlobalFilters.Filters.Add(new HandleErrorAttribute());
+                MvcHandler.DisableMvcResponseHeader = true;
+            }
 
             Configuration.JsonProvider = new Providers.DefaultJsonSerializerDeserializer();
             Configuration.CacheProvider = new Providers.DefaultCacheProvider();
@@ -396,10 +448,8 @@ namespace Library
             if (Configuration.OnVersion == null)
                 Configuration.OnVersion = n => n;
 
-            if (allowAnalytics)
+            if ((defaults & ConfigurationDefaults.analytics) == ConfigurationDefaults.analytics)
                 Analytics = new Library.Others.Analytics();
-
-            MvcHandler.DisableMvcResponseHeader = true;
         }
 
         public static void InvokeProblem(string source, string message, Uri uri)
@@ -707,7 +757,7 @@ namespace Library
             Type tv = value == null ? null : value.GetType();
             object o = null;
 
-            if (t == typeof(string))
+            if (t == ConfigurationCache.type_string)
             {
                 if (tv == null)
                     o = "";
@@ -717,7 +767,7 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(char))
+            if (t == ConfigurationCache.type_char)
             {
                 if (tv != null)
                 {
@@ -733,12 +783,12 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(int))
+            if (t == ConfigurationCache.type_int)
             {
                 if (tv != null)
                 {
                     var intVal = 0;
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         if (Int32.TryParse(value.ToString().Replace(" ", ""), out intVal))
                             o = intVal;
@@ -761,11 +811,11 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(bool))
+            if (t == ConfigurationCache.type_bool)
             {
                 if (tv != null)
                 {
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         var boolVal = value.ToString().ToLower();
                         o = boolVal == "on" || boolVal == "1" || boolVal == "true";
@@ -786,12 +836,12 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(byte))
+            if (t == ConfigurationCache.type_byte)
             {
                 if (tv != null)
                 {
                     byte byteVal = 0;
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         if (Byte.TryParse(value.ToString().Replace(" ", ""), out byteVal))
                             o = byteVal;
@@ -814,11 +864,11 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(decimal))
+            if (t == ConfigurationCache.type_decimal)
             {
                 if (tv != null)
                 {
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         try
                         {
@@ -841,12 +891,12 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(Int64))
+            if (t == ConfigurationCache.type_long)
             {
                 if (tv != null)
                 {
                     Int64 int64Val = 0;
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         if (Int64.TryParse(value.ToString().Replace(" ", ""), out int64Val))
                             o = int64Val;
@@ -868,12 +918,12 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(Int16))
+            if (t == ConfigurationCache.type_short)
             {
                 if (tv != null)
                 {
                     Int16 int16Val = 0;
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         if (Int16.TryParse(value.ToString().Replace(" ", ""), out int16Val))
                             o = int16Val;
@@ -895,11 +945,11 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(float))
+            if (t == ConfigurationCache.type_float)
             {
                 if (tv != null)
                 {
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         try
                         {
@@ -922,11 +972,11 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(double))
+            if (t == ConfigurationCache.type_double)
             {
                 if (tv != null)
                 {
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         try
                         {
@@ -949,7 +999,7 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(Guid))
+            if (t == ConfigurationCache.type_guid)
             {
                 try
                 {
@@ -965,11 +1015,11 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(DateTime))
+            if (t == ConfigurationCache.type_datetime)
             {
                 try
                 {
-                    if (tv == typeof(string))
+                    if (tv == ConfigurationCache.type_string)
                     {
                         DateTime dt;
                         if (DateTime.TryParse(value.ToString(), out dt))
@@ -988,7 +1038,7 @@ namespace Library
                 return o == null ? default(T) : (T)o;
             }
 
-            if (t == typeof(byte[]))
+            if (t == ConfigurationCache.type_byte_array)
             {
                 try
                 {
@@ -1415,7 +1465,7 @@ namespace Library
                     continue;
                 }
 
-                if (propSource.PropertyType == typeof(string))
+                if (propSource.PropertyType == ConfigurationCache.type_string)
                 {
                     if (property.PropertyType == typeof(int))
                     {
@@ -1423,43 +1473,43 @@ namespace Library
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(decimal))
+                    if (property.PropertyType == ConfigurationCache.type_decimal)
                     {
                         property.SetValue(target, value.To<decimal>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(byte))
+                    if (property.PropertyType == ConfigurationCache.type_byte)
                     {
                         property.SetValue(target, value.To<byte>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(short))
+                    if (property.PropertyType == ConfigurationCache.type_short)
                     {
                         property.SetValue(target, value.To<short>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(float))
+                    if (property.PropertyType == ConfigurationCache.type_float)
                     {
                         property.SetValue(target, value.To<float>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(bool))
+                    if (property.PropertyType == ConfigurationCache.type_bool)
                     {
                         property.SetValue(target, value.To<bool>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(long))
+                    if (property.PropertyType == ConfigurationCache.type_long)
                     {
                         property.SetValue(target, value.To<long>(), null);
                         continue;
                     }
 
-                    if (property.PropertyType == typeof(double))
+                    if (property.PropertyType == ConfigurationCache.type_double)
                     {
                         property.SetValue(target, value.To<double>(), null);
                         continue;
@@ -1468,28 +1518,28 @@ namespace Library
                     continue;
                 }
 
-                if (property.PropertyType != typeof(string))
+                if (property.PropertyType != ConfigurationCache.type_string)
                     continue;
 
-                if (propSource.PropertyType == typeof(int) || propSource.PropertyType == typeof(byte) || propSource.PropertyType == typeof(short) || propSource.PropertyType == typeof(long) || propSource.PropertyType == typeof(bool))
+                if (propSource.PropertyType == ConfigurationCache.type_int || propSource.PropertyType == ConfigurationCache.type_byte || propSource.PropertyType == ConfigurationCache.type_short || propSource.PropertyType == ConfigurationCache.type_long || propSource.PropertyType == ConfigurationCache.type_bool)
                 {
                     property.SetValue(target, value.ToString(), null);
                     continue;
                 }
 
-                if (propSource.PropertyType == typeof(decimal))
+                if (propSource.PropertyType == ConfigurationCache.type_decimal)
                 {
                     property.SetValue(target, ((decimal)value).ToString(Configuration.InvariantCulture), null);
                     continue;
                 }
 
-                if (propSource.PropertyType == typeof(float))
+                if (propSource.PropertyType == ConfigurationCache.type_float)
                 {
                     property.SetValue(target, ((float)value).ToString(Configuration.InvariantCulture), null);
                     continue;
                 }
 
-                if (propSource.PropertyType == typeof(double))
+                if (propSource.PropertyType == ConfigurationCache.type_double)
                 {
                     property.SetValue(target, ((double)value).ToString(Configuration.InvariantCulture), null);
                     continue;
@@ -2276,6 +2326,11 @@ namespace Library
 
         public static ContentResult Json(this object source, string contentType = "application/json", bool toUnicode = false)
         {
+            return source.AsJson(contentType, toUnicode);
+        }
+
+        public static ContentResult AsJson(this object source, string contentType = "application/json", bool toUnicode = false)
+        {
             var content = new ContentResult();
             content.Content = source.JsonSerialize();
             content.ContentType = contentType;
@@ -2454,7 +2509,7 @@ namespace Library
             {
                 if (withoutProperty != null && withoutProperty.Length > 0 && withoutProperty.Contains(p.Name))
                     return;
-                if (p.PropertyType == typeof(string))
+                if (p.PropertyType == ConfigurationCache.type_string)
                 {
                     var v = p.GetValue(o, null);
                     if (v == null)
@@ -2471,7 +2526,7 @@ namespace Library
 
             return PropertyEach<T>(source, (o, p) =>
             {
-                if (p.PropertyType != typeof(string))
+                if (p.PropertyType != ConfigurationCache.type_string)
                     return;
 
                 if (property.Contains(p.Name))
@@ -4196,6 +4251,7 @@ namespace Library
     #region Markdown
     public class Markdown
     {
+        private const string REPLACE_ID = "@##";
 
         public enum MarkdownListType : byte
         {
@@ -4276,6 +4332,9 @@ namespace Library
 
         public string Embedded { get; set; }
         public BreakDelegate OnBreak { get; set; }
+        public LinkDelegate OnLink { get; set; }
+        public FormatDelegate OnFormat { get; set; }
+        public ImageDelegate OnImage { get; set; }
 
         private bool skip = false;
         private string id = "";
@@ -4283,14 +4342,73 @@ namespace Library
         private MarkdownParserType status = MarkdownParserType.empty;
 
         private List<string> current = new List<string>(5);
+        private List<KeyValue> format = new List<KeyValue>(5);
         private List<MarkdownList> currentList = null;
         private List<KeyValue> currentKeyValue = null;
 
         private string output = "";
 
-        public Markdown()
+        private static Regex reg_link_1 = new Regex(@"\<.*?\>+", RegexOptions.Compiled);
+        private static Regex reg_link_2 = new Regex(@"(!)?\[[^\]]+\][\:\s\(]+.*?[^)\s$]+", RegexOptions.Compiled);
+        private static Regex reg_link_3 = new Regex(@"(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static Regex reg_link_4 = new Regex(@"(^|[^\/])(www\.[\S]+(\b|$))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex reg_image = new Regex(@"(\[)?\!\[[^\]]+\][\:\s\(]+.*?[^\s$]+", RegexOptions.Compiled);
+        private static Regex reg_format = new Regex(@"\*{1,2}.*?\*{1,2}|_{1,3}.*?_{1,3}", RegexOptions.Compiled);
+        private static Regex reg_keyword = new Regex(@"(\[.*?\]|\{.*?\})", RegexOptions.Compiled);
+        private static Regex reg_format_replace_asterix = new Regex(@"^\*{1,2}|\*{1,2}$", RegexOptions.Compiled);
+        private static Regex reg_format_replace_underscore = new Regex(@"^_{1,2}|_{1,2}$$", RegexOptions.Compiled);
+
+        public Markdown(bool delegates = true)
         {
             Embedded = "===";
+            if (!delegates)
+                return;
+
+            OnLink = (text, url) =>
+            {
+                Console.WriteLine("link -> text: {0}, url: {1}", text, url);
+                if (!(url.StartsWith("https://") || url.StartsWith("http://")))
+                    url = "http://" + url;
+                return string.Format("<a href=\"{0}\">{1}</a>", text, url);
+            };
+
+            OnFormat = (type, value) =>
+            {
+                var format = "<{0}>{1}</{0}>";
+                switch (type)
+                {
+                    case MarkdownFormatType.b:
+                        return string.Format(format, "b", value);
+                    case MarkdownFormatType.strong:
+                        return string.Format(format, "strong", value);
+                    case MarkdownFormatType.em:
+                        return string.Format(format, "em", value);
+                    case MarkdownFormatType.i:
+                        return string.Format(format, "i", value);
+                }
+                return "";
+            };
+
+            OnImage = (alt, src, width, height, url) =>
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.Append("<img");
+                sb.AppendAttribute("alt", alt);
+                sb.AppendAttribute("src", src);
+
+                if (width > 0)
+                    sb.AppendAttribute("width", width);
+
+                if (height > 0)
+                    sb.AppendAttribute("height", height);
+
+                sb.AppendAttribute("border", "0");
+
+                if (url.IsNotEmpty())
+                    return string.Format("<a href=\"{0}\">{1}</a>", url, sb.ToString());
+
+                return sb.ToString();
+            };
         }
 
         public string Compile(string text, string id = "")
@@ -4468,12 +4586,188 @@ namespace Library
 
         private string ParseOther(string line)
         {
-            // 
+            if (format.Count > 0)
+                format.Clear();
+
+            line = ParseLink(line);
+            line = ParseImage(line);
+            line = ParseFormat(line);
+            line = ParseLinkInline(line);
+            //line = parseKeyword(line);
+
+            if (format.Count == 0)
+                return line;
+
+            foreach (var m in format)
+                line = line.Replace(m.Key, m.Value);
+
             return line;
         }
 
-    }
+        private string GetReplace(string find, string replace)
+        {
+            var key = REPLACE_ID + format.Count + ';';
+            format.Add(new KeyValue(key, replace));
+            return key;
+        }
 
+        private string ParseLink(string text)
+        {
+            var output = text;
+
+            foreach (Match m in reg_link_1.Matches(output))
+            {
+                var o = m.Value;
+                var url = o.Substring(1, o.Length - 2);
+                output = output.Replace(o, GetReplace(o, OnLink(url, url)));
+            }
+
+            foreach (Match m in reg_link_2.Matches(output))
+            {
+                var o = m.Value.Trim();
+
+                // Picture
+                // Skip
+                if (o.StartsWith("[!["))
+                    continue;
+
+                var index = o.IndexOf(']');
+                if (index == -1)
+                    continue;
+
+                if (o[0] == '!')
+                    continue;
+
+                var name = o.Substring(1, index - 1).Trim();
+                var url = o.Substring(index + 1).Trim();
+                var first = url[0];
+
+                if (first == '(' || first == ':')
+                    url = url.Substring(1).Trim();
+                else
+                    continue;
+
+                if (first == '(')
+                    o += ')';
+
+                var last = url[url.Length - 1].ToString();
+                if (last == "," || last == "." || last == " ")
+                    url = url.Substring(0, url.Length - 1);
+                else
+                    last = "";
+
+                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                    url = "http://" + url;
+
+                output = output.Replace(o, GetReplace(o, (OnLink(ParseFormat(name, true), url)) + last));
+            }
+
+            return output;
+        }
+
+        private string ParseLinkInline(string text)
+        {
+            foreach (Match m in reg_link_3.Matches(text))
+            {
+                var o = m.Value.Trim();
+                var url = o;
+
+                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                    url = "http://" + url;
+
+                text = text.Replace(o, GetReplace(o, OnLink(o, url)));
+            }
+
+            foreach (Match m in reg_link_4.Matches(text))
+            {
+                var o = m.Value.Trim();
+                var url = o;
+
+                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                    url = "http://" + url;
+
+                text = text.Replace(o, GetReplace(o, OnLink(o, url)));
+            }
+
+            return text;
+        }
+
+        private string ParseFormat(string text, bool flush = false)
+        {
+            foreach (Match m in reg_format.Matches(text))
+            {
+                var o = m.Value.Trim();
+                var isAsterix = o[0] == '*';
+                var value = "";
+
+                if (isAsterix)
+                    value = OnFormat(o[1] == '*' ? MarkdownFormatType.em : MarkdownFormatType.i, reg_format_replace_asterix.Replace(o, ""));
+                else
+                    value = OnFormat(o[1] == '_' ? MarkdownFormatType.strong : MarkdownFormatType.b, reg_format_replace_underscore.Replace(o, ""));
+
+                text = text.Replace(o, flush ? value : GetReplace(o, value));
+            }
+
+            return text;
+        }
+
+        public string ParseImage(string text)
+        {
+            foreach (Match m in reg_image.Matches(text))
+            {
+                var o = m.Value.Trim();
+                var indexBeg = 2;
+
+                // Check if picture is with link
+                if (o.StartsWith("[!["))
+                    indexBeg = 3;
+
+                var index = o.IndexOf(']');
+                if (index == -1)
+                    continue;
+
+                var name = o.Substring(indexBeg, index).Trim();
+                var url = o.Substring(index + 1);
+
+                var first = url[0];
+                if (first != '(')
+                    continue;
+
+                var find = o.Substring(0, index + 1);
+
+                url = url.Substring(1, index);
+                index = url.IndexOf('#');
+                indexBeg = index;
+
+                var src = "";
+                var indexEnd = url.IndexOf(')', index);
+                var width = 0;
+                var height = 0;
+
+                if (index > 0)
+                {
+                    var dimension = url.Substring(indexBeg + 1, indexEnd).Split('x');
+                    width = dimension.Read<int>(0);
+                    height = dimension.Read<int>(1);
+                    src = url.Substring(0, index);
+                }
+                else
+                    src = url.Substring(0, indexEnd);
+
+                indexBeg = url.IndexOf('(', indexEnd);
+                indexEnd = url.LastIndexOf(')');
+
+                if (indexBeg != -1 && indexBeg > index)
+                    url = url.Substring(indexBeg + 1, indexEnd);
+                else
+                    url = "";
+
+                text = text.Replace(find, GetReplace(find, OnImage(name, src, width, height, url)));
+            }
+
+            return text;
+        }
+    }
 
     public class MarkdownOLD
     {
@@ -5419,12 +5713,17 @@ namespace Library
         public void Refresh(int items, int page, int max)
         {
             Items = items;
+            Current = page;
+
+            if (Current < 1)
+                Current = 1;
 
             if (max == 0)
                 max = 20;
 
-            Count = (items / max) + (items % max > 0 ? 1 : 0);
+            Max = max;
 
+            Count = (items / max) + (items % max > 0 ? 1 : 0);
             Current = Current - 1;
 
             if (Current < 0)

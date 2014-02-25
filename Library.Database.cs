@@ -212,10 +212,35 @@ namespace Library
     {
         public string Name { get; set; }
         public string Schema { get; set; }
+
+        public DbTableAttribute(string name)
+        {
+            Name = name;
+        }
+
+        public DbTableAttribute(string name, string schema)
+        {
+            Name = name;
+            Schema = schema;
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public class DbSchemaAttribute : Attribute
+    {
+        public string Schema { get; set; }
+
+        public DbSchemaAttribute(string schema)
+        {
+            Schema = schema;
+        }
     }
 
     [AttributeUsage(AttributeTargets.Property)]
     public class NoDbParameterAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Property)]
+    public class DbSkipAttribute : Attribute { }
     #endregion
 
     #region SqlBuilder
@@ -260,7 +285,7 @@ namespace Library
 
         public SqlBuilder Append(string column, string sqlOperator, object value)
         {
-            return AppendSql(string.Format("{0} {1} {2}", column, sqlOperator, value));
+            return AppendSql(string.Format("[{0}] {1} {2}", column, sqlOperator, value));
         }
 
         public SqlBuilder AppendSql(string sql, params object[] values)
@@ -275,7 +300,7 @@ namespace Library
         public SqlBuilder AppendParameter(string column, string sqlOperator, object value)
         {
             var pn = "_" + column + (param == null ? "0" : (param.Value.Count + 1).ToString());
-            return AppendSqlParameter(string.Format("{0} {1} @{2}", column, sqlOperator, pn), pn, value);
+            return AppendSqlParameter(string.Format("[{0}] {1} @{2}", column, sqlOperator, pn), pn, value);
         }
 
         public SqlBuilder AppendSqlParameter(string sql, string parameterName, object value)
@@ -298,7 +323,7 @@ namespace Library
         public SqlBuilder AppendLike(string name, string value, string format = "%{0}%")
         {
             var paramName = "param" + param.Value.Count;
-            return AppendSqlParameter(string.Format("{0} LIKE @{1}", name, paramName), paramName, string.Format(format, value.Replace(' ', '%')));
+            return AppendSqlParameter(string.Format("[{0}] LIKE @{1}", name, paramName), paramName, string.Format(format, value.Replace(' ', '%')));
         }
 
         public override string ToString()
@@ -609,7 +634,7 @@ namespace Library
                 if (reader.HasRows)
                 {
                     // dátum vynecháme ako ValueType, pretože pri default Activator jebe dátum od počiatku dátumu 01.01.0001
-                    var date = typeof(DateTime);
+                    var date = ConfigurationCache.type_datetime;
                     while (reader.Read())
                     {
                         var obj = new ExpandoObject();
@@ -657,7 +682,7 @@ namespace Library
                     {
 
                         // dátum vynecháme ako ValueType, pretože pri default Activator jebe dátum od počiatku dátumu 01.01.0001
-                        var date = typeof(DateTime);
+                        var date = ConfigurationCache.type_datetime;
                         while (reader.Read())
                         {
 
@@ -1406,31 +1431,32 @@ namespace Library
             {
                 var prop = arg.GetType().GetProperty(pk.Name);
                 var t = prop.PropertyType;
+
                 if (v == DBNull.Value && (pk.Insert || pk.Update))
                     v = prop.GetValue(arg, null);
-                if (t == typeof(int))
+                if (t == ConfigurationCache.type_int)
                     prop.SetValue(arg, Convert.ToInt32(v), null);
-                else if (t == typeof(byte))
+                else if (t == ConfigurationCache.type_byte)
                     prop.SetValue(arg, Convert.ToByte(v), null);
-                else if (t == typeof(Guid))
-                    prop.SetValue(arg, (Guid)v, null);
-                else if (t == typeof(Int16))
-                    prop.SetValue(arg, Convert.ToInt16(v), null);
-                else if (t == typeof(Int64))
-                    prop.SetValue(arg, Convert.ToInt64(v), null);
-                else if (t == typeof(double))
-                    prop.SetValue(arg, Convert.ToDouble(v), null);
-                else if (t == typeof(float))
-                    prop.SetValue(arg, Convert.ToSingle(v), null);
-                else if (t == typeof(decimal))
+                else if (t == ConfigurationCache.type_decimal)
                     prop.SetValue(arg, Convert.ToDecimal(v), null);
-                else if (t == typeof(uint))
+                else if (t == ConfigurationCache.type_guid)
+                    prop.SetValue(arg, (Guid)v, null);
+                else if (t == ConfigurationCache.type_short)
+                    prop.SetValue(arg, Convert.ToInt16(v), null);
+                else if (t == ConfigurationCache.type_long)
+                    prop.SetValue(arg, Convert.ToInt64(v), null);
+                else if (t == ConfigurationCache.type_double)
+                    prop.SetValue(arg, Convert.ToDouble(v), null);
+                else if (t == ConfigurationCache.type_float)
+                    prop.SetValue(arg, Convert.ToSingle(v), null);
+                else if (t == ConfigurationCache.type_uint)
                     prop.SetValue(arg, Convert.ToUInt32(v), null);
-                else if (t == typeof(UInt16))
+                else if (t == ConfigurationCache.type_ushort)
                     prop.SetValue(arg, Convert.ToUInt16(v), null);
-                else if (t == typeof(UInt64))
+                else if (t == ConfigurationCache.type_long)
                     prop.SetValue(arg, Convert.ToUInt64(v), null);
-                else if (t == typeof(string))
+                else if (t == ConfigurationCache.type_string)
                 {
                     if (v != DBNull.Value)
                         prop.SetValue(arg, (string)v, null);

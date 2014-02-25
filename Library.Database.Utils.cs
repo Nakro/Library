@@ -45,7 +45,7 @@ namespace Library.DatabaseUtils
                 return;
             }
 
-            if (propertyType == typeof(object))
+            if (propertyType == ConfigurationCache.type_object)
             {
                 if (value != null)
                     propertyType = value.GetType();
@@ -75,7 +75,7 @@ namespace Library.DatabaseUtils
                 var name = i.Name;
                 byte precision = 0;
 
-                foreach (var j in i.GetCustomAttributes(typeof(Library.DbParameterAttribute), false))
+                foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                 {
                     h = true;
                     foreach (var g in j.GetType().GetProperties())
@@ -94,7 +94,7 @@ namespace Library.DatabaseUtils
                     break;
                 }
 
-                if (!i.PropertyType.IsGenericType || ((i.PropertyType != typeof(string) && i.PropertyType != typeof(Nullable)) && i.DeclaringType.IsClass))
+                if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
                     l.Add(new Parameter(i.Name, i.PropertyType, value, size, h ? type : null, precision));
             }
 
@@ -121,7 +121,7 @@ namespace Library.DatabaseUtils
                     var name = i.Name;
                     byte precision = 0;
 
-                    foreach (var j in i.GetCustomAttributes(typeof(Library.DbParameterAttribute), false))
+                    foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                     {
                         h = true;
                         foreach (var g in j.GetType().GetProperties())
@@ -140,7 +140,7 @@ namespace Library.DatabaseUtils
                         break;
                     }
 
-                    if (!i.PropertyType.IsGenericType || ((i.PropertyType != typeof(string) && i.PropertyType != typeof(Nullable)) && i.DeclaringType.IsClass))
+                    if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
                         l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision));
                 }
             }
@@ -181,7 +181,7 @@ namespace Library.DatabaseUtils
                 var name = i.Name;
                 byte precision = 0;
 
-                foreach (var j in i.GetCustomAttributes(typeof(Library.DbParameterAttribute), false))
+                foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                 {
                     h = true;
                     foreach (var g in j.GetType().GetProperties())
@@ -204,7 +204,7 @@ namespace Library.DatabaseUtils
                     break;
                 }
 
-                if (!i.PropertyType.IsGenericType || ((i.PropertyType != typeof(string) && i.PropertyType != typeof(Nullable)) && i.DeclaringType.IsClass))
+                if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
                     l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision));
 
             }
@@ -218,76 +218,98 @@ namespace Library.DatabaseUtils
     {
         public static string GetTableName(Type t)
         {
-            var n = "";
-            foreach (var i in t.GetCustomAttributes(typeof(DbTableAttribute), false))
+            var name = t.Name;
+            var schema = "";
+
+            foreach (var i in t.GetCustomAttributes(ConfigurationCache.type_dbtable, false))
             {
                 foreach (var j in i.GetType().GetProperties())
                 {
                     var v = j.GetValue(i, null);
                     if (v != null && j.Name == "Name")
                     {
-                        n = (n != "" ? n + '.' + v.ToString() : v.ToString());
+                        name = v.ToString();
                         continue;
                     }
 
                     if (v != null && j.Name == "Schema")
                     {
-                        n = (n != "" ? v.ToString() + '.' + n : v.ToString());
+                        schema = v.ToString();
                         continue;
                     }
                 }
             }
-            return (n == "" ? t.Name : n);
+
+            if (string.IsNullOrEmpty(schema))
+            {
+                foreach (var i in t.GetCustomAttributes(ConfigurationCache.type_dbschema, false))
+                {
+                    foreach (var j in i.GetType().GetProperties())
+                    {
+                        var v = j.GetValue(i, null);
+                        if (v != null && j.Name == "Schema")
+                        {
+                            schema = v.ToString();
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(schema))
+                return name;
+
+            return schema + '.' + name;
         }
 
         public static SqlDbType ToType(Type type)
         {
-            if (type == typeof(int) || type == typeof(int?))
+            if (type == ConfigurationCache.type_int || type == ConfigurationCache.type_int_null)
                 return SqlDbType.Int;
 
-            if (type == typeof(byte) || type == typeof(byte?))
+            if (type == ConfigurationCache.type_byte || type == ConfigurationCache.type_byte_null)
                 return SqlDbType.TinyInt;
 
-            if (type == typeof(bool) || type == typeof(bool?))
+            if (type == ConfigurationCache.type_bool || type == ConfigurationCache.type_bool_null)
                 return SqlDbType.Bit;
 
-            if (type == typeof(char) || type == typeof(char?))
+            if (type == ConfigurationCache.type_char || type == ConfigurationCache.type_char_null)
                 return SqlDbType.Char;
 
-            if (type == typeof(string))
+            if (type == ConfigurationCache.type_string)
                 return SqlDbType.VarChar;
 
-            if (type == typeof(Int16) || type == typeof(Int16?))
+            if (type == ConfigurationCache.type_short || type == ConfigurationCache.type_short_null)
                 return SqlDbType.SmallInt;
 
-            if (type == typeof(decimal) || type == typeof(decimal?))
+            if (type == ConfigurationCache.type_decimal || type == ConfigurationCache.type_decimal_null)
                 return SqlDbType.Decimal;
 
-            if (type == typeof(DateTime) || type == typeof(DateTime?))
+            if (type == ConfigurationCache.type_datetime || type == ConfigurationCache.type_datetime_null)
                 return SqlDbType.DateTime;
 
-            if (type == typeof(float) || type == typeof(Single) || type == typeof(float?) || type == typeof(Single?))
+            if (type == ConfigurationCache.type_float || type == ConfigurationCache.type_float_null)
                 return SqlDbType.Float;
 
-            if (type == typeof(double) || type == typeof(Double?))
+            if (type == ConfigurationCache.type_double || type == ConfigurationCache.type_double_null)
                 return SqlDbType.Float;
 
-            if (type == typeof(Int64) || type == typeof(Int64?))
+            if (type == ConfigurationCache.type_long || type == ConfigurationCache.type_long_null)
                 return SqlDbType.BigInt;
 
-            if (type == typeof(UInt32) || type == typeof(UInt32?))
+            if (type == ConfigurationCache.type_uint || type == ConfigurationCache.type_uint_null)
                 return SqlDbType.Int;
 
-            if (type == typeof(UInt16) || type == typeof(UInt16?))
+            if (type == ConfigurationCache.type_ushort || type == ConfigurationCache.type_ushort_null)
                 return SqlDbType.SmallInt;
 
-            if (type == typeof(UInt64) || type == typeof(UInt64?))
+            if (type == ConfigurationCache.type_ulong || type == ConfigurationCache.type_ulong_null)
                 return SqlDbType.BigInt;
 
-            if (type == typeof(byte[]))
+            if (type == ConfigurationCache.type_byte_array)
                 return SqlDbType.VarBinary;
 
-            if (type == typeof(Guid) || type == typeof(Guid?))
+            if (type == ConfigurationCache.type_guid || type == ConfigurationCache.type_guid_null)
                 return SqlDbType.UniqueIdentifier;
 
             return SqlDbType.Variant;
@@ -324,10 +346,13 @@ namespace Library.DatabaseUtils
                 string raw = null;
                 SqlDbType dbType = ToType(i.PropertyType);
 
-                if (i.GetCustomAttributes(typeof(Library.NoDbParameterAttribute), false).Length > 0)
+                if (i.GetCustomAttributes(ConfigurationCache.type_nodbparameter, false).Length > 0)
                     continue;
 
-                foreach (var j in i.GetCustomAttributes(typeof(Library.DbParameterAttribute), false))
+                if (i.GetCustomAttributes(ConfigurationCache.type_dbskip, false).Length > 0)
+                    continue;
+
+                foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                 {
                     foreach (var g in j.GetType().GetProperties())
                     {

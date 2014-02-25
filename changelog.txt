@@ -23,8 +23,10 @@
 - added: uploaded File.IsImage()
 - added: uploaded File.IsAudio()
 - added: uploaded File.IsVideo()
+- added: DbSchema(schema = "")
 
 - updated: ImageConverter (supports stream)
 - updated: MarkDown parser
+- updated: JSON serializer / deserializer
 
 - renamed: Utils.Log() -> Utils.LogFile()

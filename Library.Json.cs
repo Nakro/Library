@@ -17,8 +17,8 @@ namespace Library.Json
         {
             public int Index { get; set; }
             public string Value { get; set; }
-            public bool JeArrayClass { get; set; }
-            public bool JeString { get; set; }
+            public bool IsArrayClass { get; set; }
+            public bool IsString { get; set; }
 
             public static IList<SearchValue> Search(StringBuilder sb)
             {
@@ -31,14 +31,14 @@ namespace Library.Json
                     var c = sb[i];
                     if (c == '"')
                     {
-                        var v = new SearchValue() { Index = i, Value = getWord(i, sb), JeString = true, JeArrayClass = false };
+                        var v = new SearchValue() { Index = i, Value = getWord(i, sb), IsString = true, IsArrayClass = false };
                         l.Add(v);
                         i = v.Index + v.Value.Length + 1;
                     }
                     else if (c == ':' && sb[i + 1] != '"')
                     {
                         var val = getValue(i, sb);
-                        var v = new SearchValue() { Index = i, Value = val, JeArrayClass = val[0] == '[' || val[0] == '{' };
+                        var v = new SearchValue() { Index = i, Value = val, IsArrayClass = val[0] == '[' || val[0] == '{' };
                         l.Add(v);
                         i = v.Index + v.Value.Length + 1;
                     }
@@ -80,7 +80,6 @@ namespace Library.Json
             private static string getValue(int index, StringBuilder b)
             {
                 var sb = new StringBuilder();
-
                 var countStr = 0;
                 var countArr = 0;
                 var countObj = 0;
@@ -111,12 +110,14 @@ namespace Library.Json
                         countStr--;
                         continue;
                     }
-                    else if (c == '"')
+
+                    if (c == '"')
                     {
                         countStr++;
                         continue;
                     }
-                    else if (c != '"' && countStr > 0)
+
+                    if (c != '"' && countStr > 0)
                         continue;
 
                     if (c == '[')
@@ -124,7 +125,8 @@ namespace Library.Json
                         countArr++;
                         continue;
                     }
-                    else if (c == ']' && countArr > 0)
+                    
+                    if (c == ']' && countArr > 0)
                     {
                         countArr--;
                         continue;
@@ -135,6 +137,7 @@ namespace Library.Json
                         countObj++;
                         continue;
                     }
+
                     if (c == '}' && countObj > 0)
                     {
                         countObj--;
@@ -158,8 +161,8 @@ namespace Library.Json
         {
             public string Name { get; set; }
             public string Value { get; set; }
-            public bool JeString { get; set; }
-            public bool JeArrayClass { get; set; }
+            public bool IsString { get; set; }
+            public bool IsArrayClass { get; set; }
         }
 
         public class JsonCache
@@ -306,33 +309,99 @@ namespace Library.Json
 
             var pt = o.GetType();
 
-            if (pt == typeof(int) || pt == typeof(byte) || pt == typeof(decimal) || pt == typeof(short))
+            if (pt == ConfigurationCache.type_int || pt == ConfigurationCache.type_byte || pt == ConfigurationCache.type_decimal || pt == ConfigurationCache.type_short || pt == ConfigurationCache.type_long || pt == ConfigurationCache.type_float || pt == ConfigurationCache.type_double)
             {
                 WriteNumber(sb, divider, name, o);
                 return;
             }
 
-            if (pt == typeof(string))
+            if (pt == ConfigurationCache.type_string)
             {
                 WriteString(sb, divider, name, o);
                 return;
             }
 
-            if (pt == typeof(bool))
+            if (pt == ConfigurationCache.type_bool)
             {
                 WriteBool(sb, divider, name, o);
                 return;
             }
 
-            if (pt == typeof(DateTime))
+            if (pt == ConfigurationCache.type_datetime)
             {
                 WriteString(sb, divider, name, ConverDateTimeToString((DateTime)o));
                 return;
             }
 
-            if (pt == typeof(float) || pt == typeof(double) || pt == typeof(long) || pt == typeof(UInt16) || pt == typeof(UInt32) || pt == typeof(UInt64))
+            if (pt == ConfigurationCache.type_guid)
             {
-                WriteNumber(sb, divider, name, o);
+                WriteString(sb, divider, name, o == null ? null : o.ToString());
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_datetime_null)
+            {
+                var tmp_date = o as Nullable<DateTime>;
+                if (tmp_date == null)
+                {
+                    WriteNull(sb, divider, name);
+                    return;
+                }
+                WriteString(sb, divider, name, ConverDateTimeToString(tmp_date.Value));
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_bool_null)
+            {
+                WriteNullable(sb, divider, o, 3, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_byte_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_int_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_decimal_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_short_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_long_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_float_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_double_null)
+            {
+                WriteNullable(sb, divider, o, 1, name);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_guid_null)
+            {
+                WriteNullable(sb, divider, o, 2, name);
                 return;
             }
         }
@@ -347,34 +416,148 @@ namespace Library.Json
 
             var pt = o.GetType();
 
-            if (pt == typeof(int) || pt == typeof(byte) || pt == typeof(decimal) || pt == typeof(short))
+            if (pt == ConfigurationCache.type_int || pt == ConfigurationCache.type_byte || pt == ConfigurationCache.type_decimal || pt == ConfigurationCache.type_short || pt == ConfigurationCache.type_long || pt == ConfigurationCache.type_float || pt == ConfigurationCache.type_double)
             {
                 WriteNumber(sb, divider, o);
                 return;
             }
 
-            if (pt == typeof(string))
+            if (pt == ConfigurationCache.type_string)
             {
                 WriteString(sb, divider, o);
                 return;
             }
 
-            if (pt == typeof(bool))
+            if (pt == ConfigurationCache.type_bool)
             {
                 WriteBool(sb, divider, o);
                 return;
             }
 
-            if (pt == typeof(DateTime))
+            if (pt == ConfigurationCache.type_datetime)
             {
                 WriteString(sb, divider, ConverDateTimeToString((DateTime)o));
                 return;
             }
 
-            if (pt == typeof(float) || pt == typeof(double) || pt == typeof(long) || pt == typeof(UInt16) || pt == typeof(UInt32) || pt == typeof(UInt64))
+            if (pt == ConfigurationCache.type_guid)
             {
-                WriteNumber(sb, divider, o);
+                WriteString(sb, divider, o == null ? null : o.ToString());
                 return;
+            }
+
+            if (pt == ConfigurationCache.type_datetime_null)
+            {
+                var tmp_date = o as Nullable<DateTime>;
+                if (tmp_date == null)
+                {
+                    WriteNull(sb, divider);
+                    return;
+                }
+                WriteString(sb, divider, ConverDateTimeToString(tmp_date.Value));
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_bool_null)
+            {
+                WriteNullable(sb, divider, o, 3);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_byte_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_int_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_decimal_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_short_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_long_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_float_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_double_null)
+            {
+                WriteNullable(sb, divider, o, 1);
+                return;
+            }
+
+            if (pt == ConfigurationCache.type_guid_null)
+            {
+                WriteNullable(sb, divider, o, 2);
+                return;
+            }
+        }
+
+        void WriteNullable(StringBuilder sb, bool divider, object value, int type)
+        {
+            if (value == null)
+            {
+                WriteNull(sb, divider);
+                return;
+            }
+
+            var val = value.GetType().GetProperty("Value").GetValue(value, null);
+
+            switch (type)
+            {
+                case 1:
+                    WriteNumber(sb, divider, val);
+                    return;
+                case 2:
+                    WriteString(sb, divider, val);
+                    return;
+                case 3:
+                    WriteBool(sb, divider, val);
+                    return;
+            }
+        }
+
+        void WriteNullable(StringBuilder sb, bool divider, object value, int type, string name)
+        {
+            if (value == null)
+            {
+                WriteNull(sb, divider, name);
+                return;
+            }
+
+            var val = value.GetType().GetProperty("Value").GetValue(value, null);
+
+            switch (type)
+            {
+                case 1:
+                    WriteNumber(sb, divider, name, val);
+                    return;
+                case 2:
+                    WriteString(sb, divider, name, val);
+                    return;
+                case 3:
+                    WriteBool(sb, divider, name, val);
+                    return;
             }
         }
 
@@ -455,7 +638,7 @@ namespace Library.Json
                 }
                 else
                 {
-                    if (p.PropertyType == typeof(string))
+                    if (p.PropertyType == ConfigurationCache.type_string)
                         WriteString(sb, div, nazov, p.GetValue(value, null));
                     else
                         WriteClass(sb, div, nazov, p.GetValue(value, null));
@@ -499,7 +682,7 @@ namespace Library.Json
 
                 var t = i.GetType();
 
-                if (t.IsClass && t != typeof(string))
+                if (t.IsClass && t != ConfigurationCache.type_string)
                     WriteClass(sb, div, null, i);
                 else
                     WriteStruct(sb, div, i);
@@ -524,8 +707,12 @@ namespace Library.Json
                 sb.Append('[');
 
                 if (!t.IsGenericType)
+                {
                     WriteArray(sb, false, null, o);
-                else if (isList)
+                    return sb.Append(']').ToString();
+                }
+
+                if (isList)
                 {
                     // ilist
                     var arr = o as IList;
@@ -539,8 +726,10 @@ namespace Library.Json
                     }
 
                     WriteArray(sb, false, null, obj);
+                    return sb.Append(']').ToString();
                 }
-                else if (isEnum)
+
+                if (isEnum)
                 {
                     // enumereable
                     var arr = o as IEnumerable;
@@ -550,13 +739,13 @@ namespace Library.Json
                         l.Add(obj);
 
                     WriteArray(sb, false, null, l.ToArray());
+                    return sb.Append(']').ToString();
                 }
 
-                sb.Append(']');
                 return sb.ToString();
             }
 
-            if (!t.IsClass || t == typeof(string))
+            if (!t.IsClass || t == ConfigurationCache.type_string)
             {
                 WriteStruct(sb, false, o);
                 return sb.ToString();
@@ -577,7 +766,7 @@ namespace Library.Json
                 if (!attr.Item4 || !attr.Item3)
                     continue;
 
-                if ((!pt.IsClass && pt.GetInterface("IEnumerable") == null) || pt == typeof(string))
+                if ((!pt.IsClass && pt.GetInterface("IEnumerable") == null) || pt == ConfigurationCache.type_string)
                     WriteStruct(sb, divider, attr.Item1, p.GetValue(o, null));
                 else
                 {
@@ -631,7 +820,7 @@ namespace Library.Json
                 if (i++ % 2 == 0)
                     n = j.Value;
                 else
-                    v.Add(new JsonValue() { Name = n, Value = j.Value, JeArrayClass = j.JeArrayClass, JeString = j.JeString });
+                    v.Add(new JsonValue() { Name = n, Value = j.Value, IsArrayClass = j.IsArrayClass, IsString = j.IsString });
             }
             return v;
         }
@@ -724,35 +913,52 @@ namespace Library.Json
             if (v == "null")
                 return null;
 
-            if (t == typeof(int))
+            if (t == ConfigurationCache.type_int || t == ConfigurationCache.type_int_null)
                 return Utils.To<int>(v);
 
-            if (t == typeof(bool))
+            if (t == ConfigurationCache.type_bool || t == ConfigurationCache.type_bool_null)
                 return Utils.To<bool>(v);
 
-            if (t == typeof(string))
+            if (t == ConfigurationCache.type_string)
                 return isArray ? FromSafeString(v.ToString()) : FromSafeString(Utils.To<string>(v.ToString().Substring(0, v.ToString().Length)));
 
-            if (t == typeof(DateTime))
+            if (t == ConfigurationCache.type_datetime || t == ConfigurationCache.type_datetime_null)
                 return ConvertStringToDateTime(v);
 
-            if (t == typeof(byte))
+            if (t == ConfigurationCache.type_byte || t == ConfigurationCache.type_byte_null)
                 return Utils.To<byte>(v);
 
-            if (t == typeof(decimal))
+            if (t == ConfigurationCache.type_decimal || t == ConfigurationCache.type_decimal_null)
                 return Utils.To<decimal>(v);
 
-            if (t == typeof(float))
+            if (t == ConfigurationCache.type_float || t == ConfigurationCache.type_float_null)
                 return Utils.To<float>(v);
 
-            if (t == typeof(short))
+            if (t == ConfigurationCache.type_short || t == ConfigurationCache.type_short_null)
                 return Utils.To<short>(v);
 
-            if (t == typeof(long))
+            if (t == ConfigurationCache.type_long || t == ConfigurationCache.type_long_null)
                 return Utils.To<long>(v);
 
-            if (t == typeof(double))
+            if (t == ConfigurationCache.type_double || t == ConfigurationCache.type_double_null)
                 return Utils.To<double>(v);
+
+            if (t == ConfigurationCache.type_float || t == ConfigurationCache.type_float_null)
+                return Utils.To<float>(v);
+
+            if (t == ConfigurationCache.type_guid || t == ConfigurationCache.type_guid_null)
+            {
+                Guid g;
+                if (Guid.TryParse(v, out g))
+                    return g;
+                else
+                {
+                    if (t == ConfigurationCache.type_guid_null)
+                        return null;
+                    else
+                        return Guid.Empty;
+                }
+            }
 
             return null;
         }
@@ -840,14 +1046,14 @@ namespace Library.Json
                     cache.Attributes.Add(p, attr);
                 }
 
-                var nazov = attr.Item1;
+                var name = attr.Item1;
 
                 if (!attr.Item4 || !attr.Item2)
                     continue;
 
-                if (!p.PropertyType.IsClass || p.PropertyType == typeof(string) && !p.PropertyType.IsArray)
+                if (!(p.PropertyType.IsArray && p.PropertyType.IsClass) || p.PropertyType == ConfigurationCache.type_string)
                 {
-                    item = Find(nazov, values);
+                    item = Find(name, values);
                     if (item != null)
                         p.SetValue(o, GetValue(item.Value, p.PropertyType, false), null);
                     continue;
@@ -855,13 +1061,13 @@ namespace Library.Json
 
                 if (p.PropertyType.IsArray || p.PropertyType.IsGenericType)
                 {
-                    item = Find(nazov, values);
-                    if (item != null && item.JeArrayClass)
+                    item = Find(name, values);
+                    if (item != null && item.IsArrayClass)
                         p.SetValue(o, item.Value == "[]" ? null : ParseArray(p.PropertyType, item.Value), null);
                 }
                 else
                 {
-                    item = Find(nazov, values);
+                    item = Find(name, values);
                     if (item != null)
                     {
                         if (item.Value != "null")
@@ -885,7 +1091,7 @@ namespace Library.Json
 
             foreach (var j in values)
             {
-                if (j.JeString)
+                if (j.IsString)
                     dic.Add(j.Name, FromSafeString(j.Value));
                 else if (j.Value == "false" || j.Value == "true")
                     dic.Add(j.Name, j.Value == "true");

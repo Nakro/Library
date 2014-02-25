@@ -209,7 +209,7 @@ namespace System.Web.Mvc
 
             if (value != null)
             {
-                if (value.GetType() != typeof(bool))
+                if (value.GetType() != ConfigurationCache.type_bool)
                     throw new InvalidCastException();
             }
 
@@ -336,7 +336,7 @@ namespace System.Web.Mvc
             var value = property.GetValue(model, null);
             var isChecked = false;
 
-            if (property.PropertyType == typeof(bool))
+            if (property.PropertyType == ConfigurationCache.type_bool)
             {
                 isChecked = (bool)value;
                 sb.AppendAttribute("value", "true");
