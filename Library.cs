@@ -54,7 +54,8 @@ namespace Library
     public enum ConfigurationDefaults
     {
         analytics,
-        cmd
+        cmd,
+        web
     }
 
     [AttributeUsage(AttributeTargets.Property)]
@@ -318,7 +319,7 @@ namespace Library
             get { return !HttpContext.Current.IsDebuggingEnabled; }
         }
 
-        public static void Defaults(ConfigurationDefaults defaults)
+        public static void Defaults(ConfigurationDefaults defaults = ConfigurationDefaults.web)
         {
             if ((defaults & ConfigurationDefaults.cmd) != ConfigurationDefaults.cmd)
             {
@@ -4264,7 +4265,7 @@ namespace Library
         {
             newline = 0,
             line = 1,
-            page = 2
+            pagebreak = 2
         }
 
         public enum MarkdownParagraphType : byte
@@ -4281,7 +4282,8 @@ namespace Library
             h2 = 1,
             h3 = 2,
             h4 = 5,
-            h5 = 6
+            h5 = 6,
+            h6 = 7
         }
 
         public enum MarkdownKeywordType : byte
@@ -4320,7 +4322,7 @@ namespace Library
         }
 
         public delegate string EmbeddedDelegate(string type, IList<string> lines);
-        public delegate string KeywordDelegate(MarkdownKeywordType type);
+        public delegate string KeywordDelegate(MarkdownKeywordType type, string value);
         public delegate string ParagraphDelegate(MarkdownParagraphType type, IList<string> lines);
         public delegate string LineDelegate(string line);
         public delegate string FormatDelegate(MarkdownFormatType type, string value);
@@ -4329,22 +4331,29 @@ namespace Library
         public delegate string ListDelegate(IList<MarkdownList> items);
         public delegate string KeyValueDelegate(IList<KeyValue> items);
         public delegate string BreakDelegate(MarkdownBreakType type);
+        public delegate string TitleDelegate(MarkdownTitleType type, string value);
 
         public string Embedded { get; set; }
         public BreakDelegate OnBreak { get; set; }
         public LinkDelegate OnLink { get; set; }
+        public ListDelegate OnList { get; set; }
         public FormatDelegate OnFormat { get; set; }
         public ImageDelegate OnImage { get; set; }
+        public KeywordDelegate OnKeyword { get; set; }
+        public KeyValueDelegate OnKeyValue { get; set; }
+        public ParagraphDelegate OnParagraph { get; set; }
+        public LineDelegate OnLine { get; set; }
+        public EmbeddedDelegate OnEmbedded { get; set; }
+        public TitleDelegate OnTitle { get; set; }
 
         private bool skip = false;
-        private string id = "";
         private string command = "";
         private MarkdownParserType status = MarkdownParserType.empty;
 
-        private List<string> current = new List<string>(5);
-        private List<KeyValue> format = new List<KeyValue>(5);
-        private List<MarkdownList> currentList = null;
-        private List<KeyValue> currentKeyValue = null;
+        private List<string> current = new List<string>(2);
+        private List<KeyValue> format = new List<KeyValue>(2);
+        private List<MarkdownList> currentList = new List<MarkdownList>(2);
+        private List<KeyValue> currentKeyValue = new List<KeyValue>(2);
 
         private string output = "";
 
@@ -4358,18 +4367,20 @@ namespace Library
         private static Regex reg_format_replace_asterix = new Regex(@"^\*{1,2}|\*{1,2}$", RegexOptions.Compiled);
         private static Regex reg_format_replace_underscore = new Regex(@"^_{1,2}|_{1,2}$$", RegexOptions.Compiled);
 
-        public Markdown(bool delegates = true)
+        public Markdown()
         {
             Embedded = "===";
-            if (!delegates)
-                return;
+
+            OnEmbedded = (type, lines) =>
+            {
+                return lines.Join("\n");
+            };
 
             OnLink = (text, url) =>
             {
-                Console.WriteLine("link -> text: {0}, url: {1}", text, url);
                 if (!(url.StartsWith("https://") || url.StartsWith("http://")))
                     url = "http://" + url;
-                return string.Format("<a href=\"{0}\">{1}</a>", text, url);
+                return string.Format("<a href=\"{1}\">{0}</a>", text, url);
             };
 
             OnFormat = (type, value) =>
@@ -4403,23 +4414,107 @@ namespace Library
                     sb.AppendAttribute("height", height);
 
                 sb.AppendAttribute("border", "0");
+                sb.Append(" />");
 
                 if (url.IsNotEmpty())
                     return string.Format("<a href=\"{0}\">{1}</a>", url, sb.ToString());
 
                 return sb.ToString();
             };
+
+            OnKeyword = (type, value) =>
+            {
+                return "<span>{0}</span>".format(value);
+            };
+
+            OnKeyValue = (items) =>
+            {
+                var sb = new System.Text.StringBuilder();
+
+                foreach (var m in items)
+                    sb.Append(string.Format("<dt>{0}</dt><dd>{1}</dd>", m.Key, m.Value));
+
+                return string.Format("<dl>{0}</dl>", sb.ToString());
+            };
+
+            OnList = (items) =>
+            {
+                var sb = new System.Text.StringBuilder();
+
+                foreach (var m in items)
+                    sb.Append(string.Format("<li>{0}</li>", m.Value));
+
+                return string.Format("<ul>{0}</ul>", sb.ToString());
+            };
+
+            OnParagraph = (type, lines) =>
+            {
+                return string.Format("<p class=\"paragraph\">{0}</p>", lines.Join("<br />"));
+            };
+
+            OnLine = (line) =>
+            {
+                return string.Format("<p>{0}</p>", line);
+            };
+
+            OnBreak = (type) =>
+            {
+                switch (type)
+                {
+                    case MarkdownBreakType.line:
+                    case MarkdownBreakType.pagebreak:
+                        return "<hr />";
+                    case MarkdownBreakType.newline:
+                        return "<br />";
+                }
+
+                return "";
+            };
+
+            OnTitle = (type, value) =>
+            {
+                switch (type)
+                {
+                    case MarkdownTitleType.h1:
+                        return string.Format("<h1>{0}</h1>", value);
+                    case MarkdownTitleType.h2:
+                        return string.Format("<h2>{0}</h2>", value);
+                    case MarkdownTitleType.h3:
+                        return string.Format("<h3>{0}</h3>", value);
+                    case MarkdownTitleType.h4:
+                        return string.Format("<h4>{0}</h4>", value);
+                    case MarkdownTitleType.h5:
+                        return string.Format("<h5>{0}</h5>", value);
+                }
+
+                return value;
+            };
         }
 
-        public string Compile(string text, string id = "")
+        public string Compile(string text)
         {
+
+            if (string.IsNullOrEmpty(text))
+                return "";
+
             var arr = text.Split('\n');
             var length = arr.Length;
 
-            this.id = id;
+            this.output = "";
+            this.status = MarkdownParserType.empty;
+
+            if (current.Count > 0)
+                current.Clear();
+
+            if (currentKeyValue.Count > 0)
+                currentKeyValue.Clear();
+
+            if (currentList.Count > 0)
+                currentList.Clear();
+
             skip = false;
 
-            for (var i = 0; i < arr.Length; i++)
+            for (var i = 0; i < length; i++)
             {
                 if (skip)
                 {
@@ -4428,6 +4523,7 @@ namespace Library
                 }
 
                 var line = arr[i];
+                var next = i + 1 < length ? arr[i + 1] : "";
 
                 if (ParseEmbedded(line))
                     continue;
@@ -4435,19 +4531,84 @@ namespace Library
                 if (ParseBreak(line))
                     continue;
 
+                if (ParseList(line))
+                    continue;
+
+                if (ParseKeyValue(line))
+                    continue;
+
+                if (ParseParagraph(line))
+                    continue;
+
+                if (ParseTitle(line, next))
+                    continue;
+
+                if (OnLine != null)
+                    output += OnLine(ParseOther(line));
             }
 
-            return "";
+            if (status != MarkdownParserType.empty)
+                Flush();
+
+            return output;
         }
 
         private void Flush()
         {
+            switch (status)
+            {
+                case MarkdownParserType.embedded:
+                    if (OnEmbedded != null)
+                        output += OnEmbedded(command, current);
+                    break;
 
+                case MarkdownParserType.list:
+                    if (OnList != null)
+                        output += OnList(currentList);
+                    break;
+
+                case MarkdownParserType.keyvalue:
+                    if (OnKeyValue != null)
+                        output += OnKeyValue(currentKeyValue);
+                    break;
+
+                case MarkdownParserType.paragraph:
+
+                    var typeParagraph = MarkdownParagraphType.gt;
+
+                    switch (command)
+                    {
+                        case "//":
+                            typeParagraph = MarkdownParagraphType.comment;
+                            break;
+                        case "|":
+                            typeParagraph = MarkdownParagraphType.line;
+                            break;
+                        case "/":
+                            typeParagraph = MarkdownParagraphType.slash;
+                            break;
+                    }
+
+                    if (OnParagraph != null)
+                        output += OnParagraph(typeParagraph, current);
+
+                    break;
+            }
+
+            status = MarkdownParserType.empty;
+            current.Clear();
+            currentKeyValue.Clear();
+            currentList.Clear();
+            command = "";
         }
 
         private bool ParseEmbedded(string line)
         {
             var chars = Embedded + (status != MarkdownParserType.embedded ? " " : "");
+
+            if (chars.Length > line.Length)
+                return false;
+
             var has = line.Substring(0, chars.Length) == chars;
 
             if (status != MarkdownParserType.embedded && !has)
@@ -4490,7 +4651,7 @@ namespace Library
             switch (line)
             {
                 case "***":
-                    type = MarkdownBreakType.page;
+                    type = MarkdownBreakType.pagebreak;
                     break;
                 case "---":
                     type = MarkdownBreakType.line;
@@ -4506,7 +4667,7 @@ namespace Library
         private bool ParseList(string line)
         {
             var first = line[0];
-            var second = line[1];
+            var second = line.Length > 1 ? line[1] : '\0';
             var has = (first == '-' || first == '+' || first == 'x') && (second == ' ');
 
             if (!has)
@@ -4534,6 +4695,72 @@ namespace Library
             }
 
             currentList.Add(new MarkdownList(type, ParseOther(line.Substring(2))));
+            return true;
+        }
+
+        private bool ParseTitle(string line, string next)
+        {
+            if (line.Length == 0)
+                return false;
+
+            var has = line[0] == '#';
+            var type = "";
+
+            if (!has)
+            {
+                var first = next.Length > 0 ? next[0] : '\0';
+                has = (int)line[0] > 32 && (first == '=' || first == '-');
+
+                if (has)
+                    has = line.Length == next.Length;
+
+                if (has)
+                {
+                    type = first == '=' ? "#" : "##";
+                    skip = true;
+                }
+            }
+            else
+            {
+                var index = line.IndexOf(' ');
+                if (index == -1)
+                    return false;
+
+                type = line.Substring(0, index).Trim();
+            }
+
+            if (!has)
+                return false;
+
+            if (status != MarkdownParserType.empty)
+                Flush();
+
+            var typeTitle = MarkdownTitleType.h1;
+            switch (type)
+            {
+                case "#":
+                    typeTitle = MarkdownTitleType.h1;
+                    break;
+                case "##":
+                    typeTitle = MarkdownTitleType.h2;
+                    break;
+                case "###":
+                    typeTitle = MarkdownTitleType.h3;
+                    break;
+                case "####":
+                    typeTitle = MarkdownTitleType.h4;
+                    break;
+                case "#####":
+                    typeTitle = MarkdownTitleType.h5;
+                    break;
+                case "######":
+                    typeTitle = MarkdownTitleType.h6;
+                    break;
+            }
+
+            if (OnTitle != null)
+                output += OnTitle(typeTitle, ParseOther(skip ? line : line.Substring(type.Length + 1)));
+
             return true;
         }
 
@@ -4584,6 +4811,46 @@ namespace Library
             return true;
         }
 
+        private bool ParseParagraph(string line)
+        {
+            var first = line[0];
+            var second = line.Length > 1 ? line[1] : '\0';
+            var index = 0;
+            var has = false;
+
+            switch (first)
+            {
+                case '>':
+                case '|':
+                    has = second == ' ';
+                    break;
+                case '/':
+                    has = second == '/' || line[2] == '/';
+                    index = 2;
+                    break;
+            }
+
+            if (!has)
+                return false;
+
+            if (has)
+            {
+                var tmp = first + (first == '/' ? "/" : "");
+                if (command != "" && command != tmp && status == MarkdownParserType.paragraph)
+                    Flush();
+                command = tmp;
+            }
+
+            if (status != MarkdownParserType.paragraph)
+            {
+                Flush();
+                status = MarkdownParserType.paragraph;
+            }
+
+            current.Add(ParseOther(line.Substring(index + 1).Trim()));
+            return true;
+        }
+
         private string ParseOther(string line)
         {
             if (format.Count > 0)
@@ -4593,7 +4860,7 @@ namespace Library
             line = ParseImage(line);
             line = ParseFormat(line);
             line = ParseLinkInline(line);
-            //line = parseKeyword(line);
+            line = ParseKeyword(line);
 
             if (format.Count == 0)
                 return line;
@@ -4711,14 +4978,13 @@ namespace Library
             return text;
         }
 
-        public string ParseImage(string text)
+        private string ParseImage(string text)
         {
             foreach (Match m in reg_image.Matches(text))
             {
                 var o = m.Value.Trim();
                 var indexBeg = 2;
 
-                // Check if picture is with link
                 if (o.StartsWith("[!["))
                     indexBeg = 3;
 
@@ -4726,39 +4992,42 @@ namespace Library
                 if (index == -1)
                     continue;
 
-                var name = o.Substring(indexBeg, index).Trim();
+                var name = o.Substring(indexBeg, index - indexBeg).Trim();
                 var url = o.Substring(index + 1);
 
                 var first = url[0];
                 if (first != '(')
                     continue;
 
+                index = o.LastIndexOf(')');
+                if (index == -1)
+                    continue;
+
                 var find = o.Substring(0, index + 1);
 
-                url = url.Substring(1, index);
                 index = url.IndexOf('#');
                 indexBeg = index;
 
                 var src = "";
-                var indexEnd = url.IndexOf(')', index);
+                var indexEnd = index == -1 ? url.Length : url.IndexOf(')', index);
                 var width = 0;
                 var height = 0;
 
                 if (index > 0)
                 {
-                    var dimension = url.Substring(indexBeg + 1, indexEnd).Split('x');
+                    var dimension = url.Substring(indexBeg + 1, (indexEnd - indexBeg) - 1).Split('x');
                     width = dimension.Read<int>(0);
                     height = dimension.Read<int>(1);
-                    src = url.Substring(0, index);
+                    src = url.Substring(1, index - 1);
                 }
                 else
-                    src = url.Substring(0, indexEnd);
+                    src = url.Substring(1, indexEnd - 2);
 
                 indexBeg = url.IndexOf('(', indexEnd);
                 indexEnd = url.LastIndexOf(')');
 
                 if (indexBeg != -1 && indexBeg > index)
-                    url = url.Substring(indexBeg + 1, indexEnd);
+                    url = url.Substring(indexBeg + 1, (indexEnd - indexBeg) - 1);
                 else
                     url = "";
 
@@ -4767,733 +5036,26 @@ namespace Library
 
             return text;
         }
-    }
 
-    public class MarkdownOLD
-    {
-        public class Table
+        private string ParseKeyword(string text)
         {
-            public int ColumnCount { get; set; }
-            public int Width { get; set; }
-            public List<Row> Rows { get; set; }
-        }
-
-        public class Row
-        {
-            public int Index { get; set; }
-            public List<Column> Columns { get; set; }
-        }
-
-        public class Column
-        {
-            public int Index { get; set; }
-            public int Size { get; set; }
-            public string Value { get; set; }
-        }
-
-        public class UL
-        {
-            public char Type { get; set; }
-            public int Index { get; set; }
-            public int Indent { get; set; }
-            public string Value { get; set; }
-        }
-
-        public string Name { get; set; }
-
-        /// <summary>
-        /// type, line
-        /// </summary>
-        public Func<string, string, string> OnLine { get; set; }
-
-        /// <summary>
-        /// type, lines
-        /// </summary>
-        public Func<string, IList<string>, string> OnLines { get; set; }
-
-        public Func<IList<UL>, string> OnUL { get; set; }
-        public Func<Table, string> OnTable { get; set; }
-        public Func<IList<KeyValue>, string> OnKeyValue { get; set; }
-
-        /// <summary>
-        /// name, url, return TAG
-        /// </summary>
-        public Func<string, string, string> OnLink { get; set; }
-
-        /// <summary>
-        /// type, value, return TAG
-        /// </summary>
-        public Func<string, string, string> OnFormat { get; set; }
-
-        /// <summary>
-        /// type, name, value, return TAG
-        /// </summary>
-        public Func<string, string, string, string> OnKeyword { get; set; }
-
-        /// <summary>
-        /// alt, url, width, height, return TAG
-        /// </summary>
-        public Func<string, string, int, int, string> OnImage { get; set; }
-
-        private static Regex regFormatB = new Regex(@"(^|\s|\.|\,)[^\/]+_[^_]+[^\/]+_", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regFormatSTRONG = new Regex(@"(^|\s|\.|\,)[^\/]+_{2}[^_]+[^\/]+_{2}", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regFormatI = new Regex(@"(^|\s|\.|\,|\\)\*[^\*]+\*", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regFormatEM = new Regex(@"(^|\s|\.|\,|\\)\*{2[^\*]+\*{2}", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regKeyword = new Regex("(\\[.*?\\]|\\{.*?\\})", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regImage = new Regex("\\!\\[[^\\]]+\\][\\:\\s\\(]+.*?[^)\\s$]+", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regLink1 = new Regex("\\<.*?\\>+", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static Regex regLink2 = new Regex("(!)?\\[[^\\]]+\\][\\:\\s\\(]+.*?[^)\\s]+", RegexOptions.Compiled | RegexOptions.Singleline);
-        private const string ASTERIX = "#@42#";
-        private const string UNDERSCORE = "#@95#";
-
-        private string Clean(string text)
-        {
-            if (text.IsEmpty())
-                return "";
-
-            var sb = new System.Text.StringBuilder();
-            foreach (var m in text)
-            {
-                if (m == 13 || m == 10)
-                    continue;
-
-                sb.Append(m);
-            }
-
-            return sb.ToString();
-        }
-
-        private bool IsFill(string line, char c)
-        {
-            foreach (var m in line)
-            {
-                if (m != c)
-                    return false;
-            }
-            return true;
-        }
-
-        private int CharCount(string line, char c)
-        {
-            var count = 0;
-            foreach (var m in line)
-            {
-                if (m == c)
-                    count++;
-            }
-            return count;
-        }
-
-        private char Nearest(string line)
-        {
-            foreach (var m in line)
-            {
-                if (!char.IsControl(m) && !char.IsWhiteSpace(m))
-                    return m;
-            }
-
-            return ' ';
-        }
-
-        private char FirstChar(string line)
-        {
-            if (line.Length == 0)
-                return '\0';
-            return line[0];
-        }
-
-        public string Load(string text, string name = "")
-        {
-            if (text.IsEmpty())
-                return "";
-
-            this.Name = name;
-
-            Table tmpTable = null;
-            var tmpName = "";
-            var tmp = new List<string>(10);
-            var tmpUL = new List<UL>(5);
-            var tmpKeyValue = new List<KeyValue>(5);
-
-            var lines = text.Split('\n');
-            var read = new Func<int, string>(n => n < lines.Length ? Clean(lines[n]) : "");
-            var isBlock = false;
-            var isTable = false;
-            var skip = false;
-            var index = 0;
-            var sb = new System.Text.StringBuilder();
-
-            var flushUL = new Action(() =>
-            {
-                if (OnUL != null)
-                {
-                    sb.Append(OnUL(tmpUL));
-                }
-                else
-                {
-                    foreach (var m in tmpUL)
-                        sb.Append(OnLine(null, m.Value));
-                }
-
-                tmpUL.Clear();
-            });
-
-            var flushKeyValue = new Action(() =>
-            {
-                if (OnKeyValue != null)
-                    sb.Append(OnKeyValue(tmpKeyValue));
-                tmpKeyValue.Clear();
-            });
-
-            var flushParagraph = new Action(() =>
-            {
-                isBlock = false;
-                sb.Append(OnLines(tmpName, tmp));
-                tmp.Clear();
-            });
-
-            for (var i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-
-                // Kroky
-                // 1. kontrola
-                // 2. je blok?
-                // 3. je tabuľka?
-                // 4. je odsek, čiara?
-                // 5. je UL?
-                // 6. je KeyValue?
-                // 7. je paragraf?
-                // 8. je nadpis?
-                // 9. text
-
-                if (skip)
-                {
-                    skip = false;
-                    continue;
-                }
-
-                if (isBlock)
-                {
-                    if (line.Trim().StartsWith("==="))
-                    {
-                        flushParagraph();
-                        continue;
-                    }
-
-                    tmp.Add(line);
-                    continue;
-                }
-
-                var m = Clean(line);
-
-                if (m.Length == 0)
-                {
-                    sb.Append(OnLine(null, "\n"));
-                    continue;
-                }
-
-                var c = m[0];
-                var cn = m.Length > 1 ? m[1] : '\0';
-
-                // 2. je blok?
-                if (line.StartsWith("==="))
-                {
-                    index = m.LastIndexOf('=') + 1;
-                    if (index < m.Length)
-                    {
-                        tmpName = m.Substring(index + 1).Trim();
-                        isBlock = true;
-                        continue;
-                    }
-                }
-
-                // 3. je tabuľka?
-                if (m.Length > 1)
-                {
-                    if (c == '|' && m[1] == '-' && m[m.Length - 1] == '|')
-                    {
-                        isTable = !isTable;
-
-                        if (isTable)
-                        {
-                            tmpTable = new Table();
-                            tmpTable.ColumnCount = 0;
-                            tmpTable.Rows = new List<Row>(3);
-                        }
-                        else
-                        {
-                            if (OnTable != null && tmpTable != null)
-                                sb.Append(OnTable(tmpTable));
-                        }
-                        continue;
-                    }
-
-                    if (isTable)
-                    {
-                        var columns = m.Split('|');
-                        var columnCount = columns.Length - 2;
-                        var row = new Row();
-
-                        row.Index = tmpTable.Rows.Count;
-                        row.Columns = new List<Column>(columnCount);
-
-                        if (tmpTable.ColumnCount < columnCount)
-                            tmpTable.ColumnCount = columnCount;
-
-                        for (var j = 0; j < columns.Length; j++)
-                        {
-                            var a = columns[j];
-                            if (j > 0 && j < columns.Length - 1)
-                            {
-                                row.Columns.Add(new Column() { Index = row.Columns.Count, Size = a.Length, Value = Parse(a.Trim()) });
-                                if (row.Index == 0)
-                                    tmpTable.Width += a.Length;
-                            }
-                        }
-
-                        tmpTable.Rows.Add(row);
-                        continue;
-                    }
-                }
-
-                // 4. je odsek, čiara?
-                if (m.Length > 0 && (c == '*' || c == '-'))
-                {
-                    if (IsFill(m, c))
-                    {
-                        sb.Append(OnLine(c.ToString(), m));
-                        continue;
-                    }
-                }
-
-                var next = read(i + 1);
-
-                // 5. je UL?
-                if (IsUL(m))
-                {
-                    var value = m;
-                    var a = c;
-
-                    if (Char.IsWhiteSpace(c))
-                    {
-                        a = Nearest(m);
-                        value = value.Substring(value.IndexOf(a));
-                    }
-
-                    var ul = new UL() { Index = tmpUL.Count, Indent = CharCount(m, c), Value = Parse(value.Substring(1)), Type = a };
-                    tmpUL.Add(ul);
-
-                    if (!IsUL(next))
-                        flushUL();
-
-                    continue;
-                }
-
-                if (tmpUL.Count > 0)
-                    flushUL();
-
-                // 6 je KeyValue?
-                if (IsKeyValue(m))
-                {
-                    var keyvalue = m.ParseKeyValue();
-
-                    if (keyvalue != null)
-                    {
-                        keyvalue.Key = Parse(keyvalue.Key);
-                        keyvalue.Value = Parse(keyvalue.Value);
-                        tmpKeyValue.Add(keyvalue);
-                    }
-
-                    if (!IsKeyValue(next))
-                        flushKeyValue();
-
-                    continue;
-                }
-
-                if (tmpKeyValue.Count > 0)
-                    flushKeyValue();
-
-                // 7. je paragraf?
-                if (IsParagraph(c, cn))
-                {
-                    if (FirstChar(tmpName) != c && tmp.Count > 0)
-                        flushParagraph();
-
-                    tmpName = c == '/' ? "//" : c.ToString();
-                    tmp.Add(Parse(m.Substring(1)));
-
-                    c = FirstChar(read(i + 1));
-
-                    if (!IsParagraph(c, cn))
-                        flushParagraph();
-
-                    continue;
-                }
-
-                // 8. je nadpis?
-                if (c == '#')
-                {
-                    index = m.LastIndexOf(c);
-                    if (index != m.Length)
-                    {
-                        index++;
-                        sb.Append(OnLine(m.Substring(0, index), m.Substring(index, m.Length - index).Trim()));
-                        continue;
-                    }
-                }
-
-                // kontrola či nasledujíci riadok nie je čiara kvôli nadpisu
-                if (m.Length == next.Length)
-                {
-                    c = FirstChar(next);
-                    if (c == '-' || c == '=')
-                    {
-                        sb.Append(OnLine(c == '=' ? "#" : "##", m.Trim()));
-                        skip = true;
-                        continue;
-                    }
-                }
-
-                sb.Append(OnLine(null, Parse(m)));
-            }
-
-            return sb.ToString();
-        }
-
-        private bool IsParagraph(char c, char next)
-        {
-            return c == '>' || c == '|' || (c == '/' && next == '/') || (c == '\\' && next == '\\');
-        }
-
-        private bool IsKeyValue(string line)
-        {
-            var index = line.IndexOf(':');
-            if (index == -1)
-                return false;
-
-            var countSpace = 0;
-            var countTab = 0;
-
-            foreach (var m in line.Substring(0, index))
-            {
-                if (m == '\t')
-                {
-                    countTab = 1;
-                    break;
-                }
-
-                if (m == ' ')
-                {
-                    countSpace++;
-                    if (countSpace > 2)
-                        break;
-                }
-                else
-                    countSpace = 0;
-            }
-
-            return countSpace > 2 || countTab > 1;
-        }
-
-        private bool IsUL(string value)
-        {
-            if (value.IsEmpty())
-                return false;
-
-            var c = FirstChar(value);
-
-            if (Char.IsWhiteSpace(c))
-                c = Nearest(value);
-
-            return (c == '-' || c == 'x' || c == '+') && value.IndexOf(' ') > -1;
-        }
-
-        private string Parse(string line)
-        {
-            var index = 0;
-
-            if (OnLink != null)
-                line = ParseLink(line, OnLink);
-
-            if (OnImage != null)
-                line = ParseImage(line, OnImage);
-
-            if (OnFormat != null)
-            {
-                foreach (string m in FindFormat(line))
-                {
-                    if (m.Length < 3)
-                        continue;
-
-                    var value = m;
-                    var max = 2;
-                    var isMax = false;
-
-                    if (value[0] != '*' && value[0] != '_')
-                        value = value.Substring(1);
-
-                    switch (value[0])
-                    {
-                        case '*':
-                            isMax = value.StartsWith("**");
-                            if (isMax)
-                                max = value.Length > 3 ? 4 : value.Length;
-
-                            var re = OnFormat(isMax ? "**" : "*", isMax ? value.Substring(2, value.Length - max) : value.Substring(1, value.Length - 2));
-                            if (re != null)
-                            {
-                                line = ReplaceFirst(line, value, re);
-                                // line = line.Replace(m.Value, re);
-                            }
-
-                            continue;
-
-                        case '_':
-                            var count = value.StartsWith("___") ? 3 : value.StartsWith("__") ? 2 : 1;
-                            var rb = OnFormat(value.Substring(0, count), value.Substring(count, value.Length - (count * 2)));
-                            if (rb != null)
-                            {
-                                line = ReplaceFirst(line, value, rb);
-                                // line = line.Replace(m.Value, rb);
-                            }
-                            continue;
-                    }
-                }
-            }
-
-            if (OnKeyword != null)
-            {
-                line = ParseKeyword(line, val =>
-                {
-                    var key = val.Substring(1);
-                    key = key.Substring(0, key.Length - 1);
-                    var value = "";
-
-                    index = key.IndexOf('(');
-
-                    if (index > 0)
-                    {
-                        value = key.Substring(index + 1, key.Length - (index + 2));
-                        key = key.Substring(0, index).Trim();
-                    }
-
-                    var normal = val[0] == '[';
-                    return OnKeyword(normal ? "[]" : "{}", key, value);
-                });
-            }
-
-            if (OnImage != null)
-                line = line.Replace(ASTERIX, "*").Replace(UNDERSCORE, "_");
-
-            return line.Trim();
-        }
-
-        private string ParseLink(string line, Func<string, string, string> callback)
-        {
-            if (line.IsEmpty())
-                return line;
-
-            var output = line;
-
-            foreach (Match m in regLink1.Matches(line))
-            {
-                var url = m.Value.Substring(1, m.Value.Length - 2);
-                output = output.Replace(m.Value, callback(url, url));
-            }
-
-            foreach (Match m in regLink2.Matches(line))
+            foreach (Match m in reg_keyword.Matches(text))
             {
                 var o = m.Value;
+                var type = MarkdownKeywordType.square;
 
-                var index = o.IndexOf(']');
-                if (index == -1)
-                    continue;
+                if (o[0] == '{')
+                    type = MarkdownKeywordType.composite;
 
-                if (m.Value[0] == '!')
-                    continue;
-
-                var text = o.Substring(1, index - 1).Trim();
-                var url = o.Substring(index + 1).Trim();
-
-                var first = url[0];
-
-                if (first == '(' || first == '(' || first == ':')
-                    url = url.Substring(1).Trim();
+                if (type == MarkdownKeywordType.composite)
+                    o = o.Replace(@"^\{{1}|(\}|]){1}$", "");
                 else
-                    continue;
+                    o = o.Replace(@"^\[{1}|(\]|]){1}$", "");
 
-                if (first == '(')
-                    o += ')';
-
-                var last = url[url.Length - 1];
-
-                if (last == ',' || last == '.' || last == ' ')
-                    url = url.Substring(0, url.Length - 1);
-                else
-                    last = '\0';
-
-                output = ReplaceFirst(output, o, callback(text, url) + (last == '\0' ? "" : last.ToString()));
-                //output = output.Replace(o, callback(text, url) + (last == '\0' ? "" : last.ToString()));
+                text = text.Replace(o, GetReplace(o, OnKeyword(type, o)));
             }
 
-            return output;
-        }
-
-        private string ParseImage(string line, Func<string, string, int, int, string> callback)
-        {
-            if (line.IsEmpty())
-                return line;
-
-            var output = line;
-            foreach (Match m in regImage.Matches(line))
-            {
-                var o = m.Value;
-                var index = o.IndexOf(']');
-                if (index == -1)
-                    continue;
-
-                var text = o.Substring(2, index - 2).Trim();
-                var url = o.Substring(index + 1).Trim();
-
-                var first = url[0];
-                if (first != '(')
-                    continue;
-
-                url = url.Substring(1);
-
-                index = url.IndexOf('#');
-                string[] dimension = null;
-
-                if (index > 0)
-                {
-                    dimension = url.Substring(index + 1).Split('x');
-                    url = url.Substring(0, index);
-                }
-
-                output = ReplaceFirst(output, o + ')', callback(text, url, dimension != null ? dimension.Read<int>(0) : 0, dimension != null ? dimension.Read<int>(1) : 0).Replace("*", ASTERIX).Replace("_", UNDERSCORE));
-                //output = output.Replace(o + ')', callback(text, url, dimension != null ? dimension.Read<int>(0) : 0, dimension != null ? dimension.Read<int>(1) : 0).Replace("*", ASTERIX).Replace("_", UNDERSCORE));
-            }
-
-            return output;
-        }
-
-        private string ReplaceFirst(string text, string search, string replace)
-        {
-            int pos = text.IndexOf(search);
-            if (pos < 0)
-                return text;
-            return text.Substring(0, pos) + replace + text.Substring(pos + search.Length);
-        }
-
-        private static IEnumerable<string> FindFormat(string line)
-        {
-            var zoznam = new List<string>(5);
-            var beg = -1;
-            var length = line.Length;
-
-            for (var i = 0; i < length; i++)
-            {
-                var c = line[i];
-                var prev = i > 0 ? line[i - 1] : '\0';
-                var next = i + 1 < length ? line[i + 1] : '\0';
-
-                if (beg != -1)
-                {
-                    if (c == '.' && (next == '\0' || next == ' '))
-                        beg = -1;
-                }
-
-                if (c == '*' || c == '_')
-                {
-
-                    if (beg != -1)
-                    {
-                        if (next == '*' || next == '_')
-                        {
-                            i++;
-                            next = i + 1 < length ? line[i + 1] : '\0';
-                        }
-
-                        if (next != '\0' && next != '.' && next != ',' && next != ' ' && next != '-' && next != ':')
-                        {
-                            beg = -1;
-                            continue;
-                        }
-
-                        zoznam.Add(line.Substring(beg, (i - beg) + 1));
-                        beg = -1;
-                    }
-                    else
-                    {
-                        if ((prev == '\0' || prev == ' '))
-                        {
-                            if (i == 0 || prev == '\0' || prev == '.' || prev == ',' || prev == ' ')
-                                beg = i;
-
-                            if (next == '*' || next == '_')
-                                i++;
-                        }
-
-                    }
-                }
-
-            }
-
-            return zoznam.OrderByDescending(n => n.Length);
-        }
-
-        private string ParseKeyword(string line, Func<string, string> cb)
-        {
-            if (line.IsEmpty())
-                return line;
-
-            var indexBegA = -1;
-            var indexBegB = -1;
-            var index = 0;
-            var output = line;
-
-            do
-            {
-                var c = line[index];
-
-                switch (c)
-                {
-                    case '[':
-
-                        indexBegA = index;
-                        indexBegB = -1;
-                        break;
-
-                    case ']':
-
-                        if (indexBegA > -1)
-                        {
-                            var value = line.Substring(indexBegA, (index - indexBegA) + 1);
-                            output = ReplaceFirst(output, value, cb(value));
-                            //output.Replace(value, cb(value));
-                        }
-
-                        break;
-                    case '{':
-
-                        indexBegB = index;
-                        indexBegA = -1;
-                        break;
-                    case '}':
-                        if (indexBegB > -1)
-                        {
-                            var value = line.Substring(indexBegB, (index - indexBegB) + 1);
-                            output = ReplaceFirst(output, value, cb(value));
-                            //output = output.Replace(value, cb(value));
-                        }
-                        break;
-                }
-
-                index++;
-            } while (index < line.Length);
-
-            return output;
+            return text;
         }
     }
     #endregion
