@@ -164,6 +164,7 @@ namespace Library
         string Serialize(object value, params string[] withoutProperty);
         T DeserializeObject<T>(string value);
         dynamic DeserializeObject(string value);
+        object DeserializeObject(string value, Type type);
     }
 
     public interface ILibraryCacheProvider

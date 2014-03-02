@@ -38,7 +38,6 @@ namespace Library
     {
         string TableName { get; set; }
 
-        Func<string, object, object> OnBind { get; set; }
         ISql<T> Use(Action<ISql<T>> declaration);
         IDatabase DB { get; }
 
@@ -127,7 +126,7 @@ namespace Library
         bool Prepare { get; set; }
         int Execute(string sql, IList<Parameter> parameters);
         object Scalar(string sql, IList<Parameter> parameters);
-        IEnumerable<T> ReaderEnumerator<T>(string sql, IList<Parameter> parameters, Func<string, Tuple<string, string, Func<string, object, object>>> onColumnMap, bool singleRow = false);
+        IEnumerable<T> ReaderEnumerator<T>(string sql, IList<Parameter> parameters, Func<string, DatabaseColumnMap> onColumnMap, bool singleRow = false);
         IEnumerable<dynamic> ReaderEnumerator(string sql, IList<Parameter> parameters, bool singleRow = false);
         bool ReaderBinary(string sql, IList<Parameter> parameters, Action<byte[]> onReadBinary);
         void ReaderMultiple(string sql, IList<Parameter> parameters, Func<int, dynamic, ReaderCursor> onRead);
@@ -194,6 +193,8 @@ namespace Library
             set { select = value ? 1 : 0; }
         }
 
+        public bool Json { get; set; }
+
         public bool IsInsert
         {
             get { return insert != 2; }
@@ -205,6 +206,30 @@ namespace Library
         }
 
         public bool PrimaryKey { get; set; }
+
+        public DbParameterAttribute()
+        { }
+
+        public DbParameterAttribute(int size)
+        {
+            Size = size;
+        }
+
+        public DbParameterAttribute(SqlDbType type)
+        {
+            Type = type;
+        }
+
+        public DbParameterAttribute(int size, SqlDbType type)
+        {
+            Size = size;
+            Type = type;
+        }
+
+        public DbParameterAttribute(bool isPrimary)
+        {
+            PrimaryKey = isPrimary;
+        }
     }
 
     [AttributeUsage(AttributeTargets.Class)]
@@ -403,6 +428,20 @@ namespace Library
     #endregion
 
     #region Database (SqlServer)
+    public class DatabaseColumnMap
+    {
+        public string DbName { get; set; }
+        public string Name { get; set; }
+        public bool Json { get; set; }
+
+        public DatabaseColumnMap(string dbName, string name, bool json = false)
+        {
+            DbName = dbName;
+            Name = name;
+            Json = json;
+        }
+    }
+
     public class Database : IConnection<Database>, IDatabase, IDisposable
     {
         public bool IsOpened { get; private set; }
@@ -458,7 +497,7 @@ namespace Library
 
         internal void _error(Exception ex)
         {
-            throw ex;
+            throw new Exception(_sql, ex);
         }
 
         public void Open(string connString, System.Data.IsolationLevel? isoLevel)
@@ -768,7 +807,7 @@ namespace Library
             }
         }
 
-        public IEnumerable<T> ReaderEnumerator<T>(string sql, IList<Parameter> parameters, Func<string, Tuple<string, string, Func<string, object, object>>> onColumnMap, bool singleRow = false)
+        public IEnumerable<T> ReaderEnumerator<T>(string sql, IList<Parameter> parameters, Func<string, DatabaseColumnMap> onColumnMap, bool singleRow = false)
         {
             if (sql != _sql)
             {
@@ -784,7 +823,7 @@ namespace Library
 
             using (var reader = cmd.ExecuteReader(singleRow ? CommandBehavior.SingleRow : CommandBehavior.SingleResult))
             {
-                var l = new List<Tuple<string, string, Func<string, object, object>>>(reader.FieldCount);
+                var l = new List<DatabaseColumnMap>(reader.FieldCount);
 
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
@@ -799,20 +838,36 @@ namespace Library
                     yield break;
                 }
 
-                if (reader.HasRows)
+                if (!reader.HasRows)
                 {
-                    var typ = typeof(T);
-                    while (reader.Read())
-                    {
-                        var obj = Activator.CreateInstance(typ);
-                        foreach (var i in l)
-                        {
-                            var value = reader[i.Item1];
-                            typ.GetProperty(i.Item2).SetValue(obj, (i.Item3 == null ? value == DBNull.Value ? null : value : i.Item3(i.Item1, value == DBNull.Value ? null : value)), null);
-                        }
-                        yield return (T)obj;
-                    }
+                    reader.Close();
+                    yield break;
                 }
+
+                var typ = typeof(T);
+                while (reader.Read())
+                {
+                    var obj = Activator.CreateInstance(typ);
+
+                    foreach (var i in l)
+                    {
+                        var value = reader[i.DbName];
+                        object bindValue = null;
+
+                        if (i.Json)
+                        {
+                            if (value != DBNull.Value)
+                                bindValue = Configuration.JsonProvider.DeserializeObject(value as string, typ);
+                        }
+                        else if (value != DBNull.Value)
+                            bindValue = value;
+
+                        typ.GetProperty(i.Name).SetValue(obj, bindValue, null);
+                    }
+
+                    yield return (T)obj;
+                }
+
                 reader.Close();
             }
         }
@@ -838,7 +893,18 @@ namespace Library
                             v.Scale = (byte)p.Size;
                     }
 
-                    v.Value = (p.Value == null ? DBNull.Value : p.Value);
+                    if (p.Json)
+                    {
+                        if (p.Type == SqlDbType.Variant)
+                            p.Type = SqlDbType.VarChar;
+
+                        v.Value = p.Value == null ? "null" : Configuration.JsonProvider.Serialize(p.Value);
+
+                    }
+                    else
+                        v.Value = (p.Value == null ? DBNull.Value : p.Value);
+
+
                 }
                 return;
             }
@@ -856,7 +922,16 @@ namespace Library
                             v.Precision = p.Precision;
                         if (p.Size > 0)
                             v.Scale = (byte)p.Size;
+                        continue;
+                    }
 
+                    if (p.Json)
+                    {
+                        if (p.Type == SqlDbType.Variant)
+                            v.SqlDbType = SqlDbType.VarChar;
+
+                        v.Value = p.Value == null ? "null" : Configuration.JsonProvider.Serialize(p.Value);
+                        SetupString(v, p.IsSizeDeclared);
                         continue;
                     }
 
@@ -868,6 +943,13 @@ namespace Library
                     }
 
                     v.Value = (p.Value == null ? DBNull.Value : p.Value);
+                    continue;
+                }
+
+                if (p.Json)
+                {
+                    param.Value = p.Value == null ? "null" : Configuration.JsonProvider.Serialize(p.Value);
+                    SetupString(param, p.IsSizeDeclared);
                     continue;
                 }
 
@@ -897,7 +979,7 @@ namespace Library
 
             if (sizeDeclared)
             {
-                param.Value = str.Max(param.Size, "...");
+                param.Value = str.Max(param.Size);
                 return;
             }
 
@@ -989,8 +1071,6 @@ namespace Library
         public string TableName { get; set; }
         public bool AutoLocking { get; set; }
 
-        public Func<string, object, object> OnBind { get; set; }
-
         private IDatabase db = null;
         private Column[] columns;
 
@@ -1002,6 +1082,17 @@ namespace Library
                 foreach (var m in columns)
                     l.Add(m.Name);
                 return l;
+            }
+        }
+
+        public string PrimaryKey
+        {
+            get
+            {
+                foreach (var m in columns)
+                    if (m.PrimaryKey)
+                        return m.Name;
+                return null;
             }
         }
 
@@ -1074,16 +1165,17 @@ namespace Library
 
         public IEnumerable<T> ReaderParam(string sql, IList<Parameter> arg, bool singleRow = false)
         {
-            Func<string, Tuple<string, string, Func<string, object, object>>> OnColumnMap = delegate(string n)
-            {
-                var c = columns.FirstOrDefault(m => m.DbName == n);
+            return db.ReaderEnumerator<T>(sql, arg, Mapping, singleRow);
+        }
 
-                if (c == null)
-                    return null;
+        private DatabaseColumnMap Mapping(string name)
+        {
+            var c = columns.FirstOrDefault(m => m.DbName == name);
 
-                return new Tuple<string, string, Func<string, object, object>>(c.DbName, c.Name, null);
-            };
-            return db.ReaderEnumerator<T>(sql, arg, OnColumnMap, singleRow);
+            if (c == null)
+                return null;
+
+            return new DatabaseColumnMap(c.DbName, c.Name, c.Json);
         }
 
         public object Scalar(string columnName, SqlBuilder builder)
@@ -1114,7 +1206,7 @@ namespace Library
             }
 
             if (string.IsNullOrEmpty(p))
-                throw new Exception("Primary key not implement.");
+                throw new Exception("Primary key is not implemented.");
 
             return Reader(string.Format("SELECT TOP 1 {0} FROM {1} WHERE {2}=@Id", sb.ToString(), GetTableNameSelect, p), new { Id = primaryKey }).FirstOrDefault();
         }
@@ -1243,7 +1335,7 @@ namespace Library
             }
 
             if (pk == null)
-                throw new Exception("Primary key not implemented.");
+                throw new Exception("Primary key is not implemented.");
 
             return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), pk.DbName + "=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
         }
@@ -1327,7 +1419,7 @@ namespace Library
                 throw new Exception("You must define a property name");
 
             if (pk == null)
-                throw new Exception("Primary key not implemented.");
+                throw new Exception("Primary key is not implemented.");
 
             return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), pk.DbName + "=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
         }
@@ -1480,7 +1572,7 @@ namespace Library
             }
 
             if (pk == null)
-                throw new Exception("Primary key not implemented.");
+                throw new Exception("Primary key is not implemented.");
 
             return db.Execute(string.Format("DELETE FROM {0} WHERE {1}", GetTableNameUpdate, pk.DbName + "=@" + pk.DbName), Parameter.CreateFromObject(arg));
         }
@@ -1568,36 +1660,106 @@ namespace Library
             return new Sql<T>(db);
         }
 
-        public bool Update(IDatabase db, params string[] disablePropertyName)
+        public virtual bool Update(IDatabase db, params string[] disablePropertyName)
         {
             _isnew = false;
             return new Sql<T>(db).Update(this, disablePropertyName) > 0;
         }
 
-        public bool UpdateOnly(IDatabase db, params string[] propertyName)
+        public virtual bool UpdateOnly(IDatabase db, params string[] propertyName)
         {
             _isnew = false;
             return new Sql<T>(db).UpdateOnly(this, propertyName) > 0;
         }
 
-        public bool Insert(IDatabase db, params string[] disablePropertyName)
+        public virtual bool Insert(IDatabase db, params string[] disablePropertyName)
         {
             return _isnew = (new Sql<T>(db).Insert(this, disablePropertyName) != null);
         }
 
-        public bool Save(IDatabase db, params string[] disablePropertyName)
+        public virtual bool Save(IDatabase db, params string[] disablePropertyName)
         {
-            if (!Update(db, disablePropertyName))
+            var sql = new Sql<T>(db);
+            var name = sql.PrimaryKey;
+
+            if (string.IsNullOrEmpty(name))
+                throw new Exception("Primary key is not implemented.");
+
+            var type = typeof(T);
+            var prop = type.GetProperty(name);
+            var value = prop.GetValue(this, null);
+            var propType = prop.GetType();
+            var insert = false;
+
+            if (propType == ConfigurationCache.type_string)
+                insert = (value == null || value.ToString().Length == 0);
+            else if (propType == ConfigurationCache.type_int)
+                insert = (value == null || (int)value == 0);
+            else if (propType == ConfigurationCache.type_guid)
+                insert = (value == null || (Guid)value == Guid.Empty);
+            else if (propType == ConfigurationCache.type_byte)
+                insert = (value == null || (byte)value == 0);
+            else if (propType == ConfigurationCache.type_short)
+                insert = (value == null || (short)value == 0);
+            else if (propType == ConfigurationCache.type_long)
+                insert = (value == null || (short)value == 0);
+            else if (propType == ConfigurationCache.type_uint)
+                insert = (value == null || (uint)value == 0);
+            else if (propType == ConfigurationCache.type_ulong)
+                insert = (value == null || (uint)value == 0);
+            else if (propType == ConfigurationCache.type_ushort)
+                insert = (value == null || (uint)value == 0);
+
+            if (insert)
                 return Insert(db, disablePropertyName);
-            return true;
+
+            return Update(db, disablePropertyName);
         }
 
-        public bool Delete(IDatabase db)
+        public virtual bool Delete(IDatabase db)
         {
             return new Sql<T>(db).Delete(this) > 0;
         }
 
-        public bool IsNew()
+        public static T Load(IDatabase db, object primaryKey)
+        {
+            return new Sql<T>(db).FindByPK(primaryKey);
+        }
+
+        public virtual bool Refresh(IDatabase db)
+        {
+            var sql = new Sql<T>(db);
+            var name = sql.PrimaryKey;
+
+            if (string.IsNullOrEmpty(name))
+                throw new Exception("Primary key is not implemented.");
+
+            var type = typeof(T);
+            var value = type.GetProperty(name).GetValue(this, null);
+            var self = sql.FindByPK(value);
+
+            if (self == null)
+                return false;
+
+            foreach (var m in sql.Columns)
+                type.GetProperty(m).SetValue(this, type.GetProperty(m).GetValue(self, null), null);
+
+            return true;
+        }
+
+        public virtual T Duplicate(IDatabase db)
+        {
+            var sql = new Sql<T>(db);
+            var name = sql.PrimaryKey;
+
+            if (string.IsNullOrEmpty(name))
+                throw new Exception("Primary key is not implemented.");
+
+            var value = typeof(T).GetProperty(name).GetValue(this, null);
+            return sql.FindByPK(value);
+        }
+
+        public virtual bool IsNew()
         {
             return _isnew;
         }

@@ -221,6 +221,19 @@ namespace Library.Json
             }
         }
 
+        public static object DeserializeObject(string json, Type type)
+        {
+            try
+            {
+                return _serializer.Deserialize(json.Trim());
+            }
+            catch (Exception Ex)
+            {
+                IsException("DeSerializeObject", Ex);
+                return null;
+            }
+        }
+
         public static dynamic DeserializeObject(string json)
         {
             try
@@ -1130,6 +1143,16 @@ namespace Library.Json
                 return (T)ParseArray(t, value);
 
             return (T)ParseObject(t, value);
+        }
+
+        public object DeserializeType(string value, Type type)
+        {
+            var t = type;
+
+            if (value[0] == '[' && (t.IsGenericType || t.IsArray))
+                return ParseArray(t, value);
+
+            return ParseObject(t, value);
         }
         #endregion
 

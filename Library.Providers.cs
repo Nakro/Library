@@ -27,6 +27,11 @@ namespace Library.Providers
         {
             return JsonSerializer.DeserializeObject(value);
         }
+
+        public virtual object DeserializeObject(string value, Type type)
+        {
+            return JsonSerializer.DeserializeObject(value, type);
+        }
     }
     #endregion
 

@@ -23,18 +23,22 @@ namespace Library.DatabaseUtils
         public string Name { get; set; }
         public object Value { get; set; }
         public int Size { get; set; }
+        public byte Scale { get; set; }
         public byte Precision { get; set; }
         public SqlDbType Type { get; set; }
 
         internal bool IsAttributDeclared { get; set; }
         public bool IsSizeDeclared { get; set; }
+        public bool Json { get; set; }
 
-        public Parameter(string name, System.Type propertyType, object value, int size, SqlDbType? type, byte precision = 10)
+        public Parameter(string name, System.Type propertyType, object value, int size, SqlDbType? type, byte precision = 10, bool json = false, byte scale = 2)
         {
             this.Name = name;
             this.Value = value;
             this.Size = size;
+            this.Scale = scale;
             this.Precision = precision;
+            this.Json = json;
 
             if (Size > 0)
                 IsSizeDeclared = true;
@@ -74,28 +78,46 @@ namespace Library.DatabaseUtils
                 var size = 0;
                 var name = i.Name;
                 byte precision = 0;
+                byte scale = 0;
+                var json = false;
 
                 foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                 {
                     h = true;
+
                     foreach (var g in j.GetType().GetProperties())
                     {
                         var v = g.GetValue(j, null);
-                        if (v != null)
+                        if (v == null)
+                            continue;
+
+                        switch (g.Name)
                         {
-                            if (g.Name == "Size")
+                            case "Size":
                                 size = (int)v;
-                            else if (g.Name == "Precision")
+                                break;
+                            case "Precision":
                                 precision = (byte)v;
-                            else if (g.Name == "Type")
+                                break;
+                            case "Scale":
+                                scale = (byte)v;
+                                break;
+                            case "Type":
                                 type = (SqlDbType)v;
+                                if (type == SqlDbType.Variant)
+                                    type = null;
+                                break;
+                            case "Json":
+                                json = (bool)v;
+                                break;
                         }
                     }
+
                     break;
                 }
 
                 if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
-                    l.Add(new Parameter(i.Name, i.PropertyType, value, size, h ? type : null, precision));
+                    l.Add(new Parameter(i.Name, i.PropertyType, value, size, h ? type : null, precision, json, scale));
             }
 
             return l;
@@ -119,7 +141,9 @@ namespace Library.DatabaseUtils
                     var h = false;
                     var size = 0;
                     var name = i.Name;
+                    var json = false;
                     byte precision = 0;
+                    byte scale = 0;
 
                     foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                     {
@@ -127,21 +151,36 @@ namespace Library.DatabaseUtils
                         foreach (var g in j.GetType().GetProperties())
                         {
                             var v = g.GetValue(j, null);
-                            if (v != null)
+                            if (v == null)
+                                continue;
+
+                            switch (g.Name)
                             {
-                                if (g.Name == "Size")
+                                case "Size":
                                     size = (int)v;
-                                else if (g.Name == "Precision")
+                                    break;
+                                case "Precision":
                                     precision = (byte)v;
-                                else if (g.Name == "Type")
+                                    break;
+                                case "Scale":
+                                    scale = (byte)v;
+                                    break;
+                                case "Type":
                                     type = (SqlDbType)v;
+                                    if (type == SqlDbType.Variant)
+                                        type = null;
+                                    break;
+                                case "Json":
+                                    json = (bool)v;
+                                    break;
                             }
+
                         }
                         break;
                     }
 
                     if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
-                        l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision));
+                        l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision, json, scale));
                 }
             }
             return l;
@@ -160,7 +199,7 @@ namespace Library.DatabaseUtils
                 else
                     return null;
             }
-            
+
             if (o.GetType() == typeof(List<Parameter>))
             {
                 var b = (o as List<Parameter>);
@@ -179,7 +218,9 @@ namespace Library.DatabaseUtils
                 var h = false;
                 var size = 0;
                 var name = i.Name;
+                var json = false;
                 byte precision = 0;
+                byte scale = 0;
 
                 foreach (var j in i.GetCustomAttributes(ConfigurationCache.type_dbparameter, false))
                 {
@@ -187,25 +228,35 @@ namespace Library.DatabaseUtils
                     foreach (var g in j.GetType().GetProperties())
                     {
                         var v = g.GetValue(j, null);
-                        if (v != null)
+                        if (v == null)
+                            continue;
+
+                        switch (g.Name)
                         {
-                            if (g.Name == "Size")
+                            case "Size":
                                 size = (int)v;
-                            else if (g.Name == "Precision")
+                                break;
+                            case "Scale":
+                                scale = (byte)v;
+                                break;
+                            case "Precision":
                                 precision = (byte)v;
-                            else if (g.Name == "Type")
-                            {                                
+                                break;
+                            case "Type":
                                 type = (SqlDbType)v;
                                 if (type == SqlDbType.Variant)
                                     type = null;
-                            }
+                                break;
+                            case "Json":
+                                json = (bool)v;
+                                break;
                         }
                     }
                     break;
                 }
 
                 if (!i.PropertyType.IsGenericType || ((i.PropertyType != ConfigurationCache.type_string && i.PropertyType != ConfigurationCache.type_nullable) && i.DeclaringType.IsClass))
-                    l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision));
+                    l.Add(new Parameter(name, i.PropertyType, i.GetValue(o, null), size, h ? type : null, precision, json, scale));
 
             }
             return l;
@@ -226,16 +277,17 @@ namespace Library.DatabaseUtils
                 foreach (var j in i.GetType().GetProperties())
                 {
                     var v = j.GetValue(i, null);
-                    if (v != null && j.Name == "Name")
-                    {
-                        name = v.ToString();
+                    if (v == null)
                         continue;
-                    }
 
-                    if (v != null && j.Name == "Schema")
+                    switch (j.Name)
                     {
-                        schema = v.ToString();
-                        continue;
+                        case "Name":
+                            name = v.ToString();
+                            break;
+                        case "Schema":
+                            schema = v.ToString();
+                            break;
                     }
                 }
             }
@@ -247,11 +299,11 @@ namespace Library.DatabaseUtils
                     foreach (var j in i.GetType().GetProperties())
                     {
                         var v = j.GetValue(i, null);
-                        if (v != null && j.Name == "Schema")
-                        {
-                            schema = v.ToString();
+                        if (v == null)
                             continue;
-                        }
+
+                        if (j.Name == "Schema")
+                            schema = v.ToString();
                     }
                 }
             }
@@ -317,15 +369,13 @@ namespace Library.DatabaseUtils
 
         internal static string Append(string dbName, string raw, string name)
         {
-            if (string.IsNullOrEmpty(raw))
-            {
-                if (dbName == name)
-                    return string.Format("[{0}]", name);
-                else
-                    return string.Format("[{0}] AS {1}", dbName, name);
-            }
-            else
-                return raw + " AS " + name;
+            if (!string.IsNullOrEmpty(raw))
+                return string.Format("{0} AS [{0}]", raw, name);
+
+            if (dbName == name)
+                return string.Format("[{0}]", name);
+
+            return string.Format("[{0}] AS [{1}]", dbName, name);
         }
 
         internal static List<Column> GetColumnName(Type t)
@@ -342,6 +392,7 @@ namespace Library.DatabaseUtils
                 var select = true;
                 var isUpdate = true;
                 var isInsert = true;
+                var json = false;
 
                 string raw = null;
                 SqlDbType dbType = ToType(i.PropertyType);
@@ -357,56 +408,47 @@ namespace Library.DatabaseUtils
                     foreach (var g in j.GetType().GetProperties())
                     {
                         var v = g.GetValue(j, null);
+                        if (v == null)
+                            continue;
+
                         if (g.Name == "Name")
                         {
-                            if (v == null)
-                                continue;
-
                             name = (string)v;
+                            continue;
+                        }
+
+                        if (g.Name == "Json")
+                        {
+                            json = (bool)v;
                             continue;
                         }
 
                         if (g.Name == "Update")
                         {
-                            if (v == null)
-                                continue;
-
                             update = (bool)v;
                             continue;
                         }
 
                         if (g.Name == "Insert")
                         {
-                            if (v == null)
-                                continue;
-
                             insert = (bool)v;
                             continue;
                         }
 
                         if (g.Name == "IsInsert")
                         {
-                            if (v == null)
-                                continue;
-
                             isInsert = (bool)v;
                             continue;
                         }
 
                         if (g.Name == "IsUpdate")
                         {
-                            if (v == null)
-                                continue;
-
                             isUpdate = (bool)v;
                             continue;
                         }
 
                         if (g.Name == "Select")
                         {
-                            if (v == null)
-                                continue;
-
                             select = (bool)v;
                             continue;
                         }
@@ -419,9 +461,6 @@ namespace Library.DatabaseUtils
 
                         if (g.Name == "Raw")
                         {
-                            if (v == null)
-                                continue;
-
                             raw = (string)v;
                             continue;
                         }
@@ -440,7 +479,7 @@ namespace Library.DatabaseUtils
                 if (primary && !isUpdate)
                     update = false;
 
-                l.Add(new Column() { Name = i.Name, DbName = name, Update = update, Insert = insert, PrimaryKey = primary, Raw = raw, Select = select, Type = dbType });
+                l.Add(new Column() { Name = i.Name, DbName = name, Update = update, Insert = insert, PrimaryKey = primary, Raw = raw, Select = select, Type = dbType, Json = json });
             }
 
             return l;
@@ -464,7 +503,9 @@ namespace Library.DatabaseUtils
         [DefaultValue(true)]
         public bool Select { get; set; }
 
+        public bool Json { get; set; }
         public bool PrimaryKey { get; set; }
+
         public SqlDbType Type { get; set; }
     }
     #endregion

@@ -13,7 +13,7 @@ namespace System.Web.Mvc
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 14. 09. 2011
-    // Updated      : 13. 03. 2013
+    // Updated      : 28. 02. 2014
     // Description  : MVC Custom Extension
     // ===============================================================================================
 
@@ -593,6 +593,111 @@ namespace System.Web.Mvc
             if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
                 return url;
             return Library.Configuration.Url.Image + url;
+        }
+
+        public static void Ng(this HtmlHelper source, string version, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                name = new string[1] { "angular" };
+
+            foreach (var m in name)
+            {
+                var filename = m.ToLower();
+
+                if (filename != "angular" && filename.IndexOf("angular") == -1)
+                    filename = "angular-" + filename;
+
+                Head(source, "//ajax.googleapis.com/ajax/libs/angularjs/" + version + '/' + filename + ".min.js");
+            }
+        }
+
+        public static void NgController(this HtmlHelper source, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                return;
+
+            foreach (var m in name)
+            {
+                var filename = m;
+                if (filename.LastIndexOf(".js") == -1)
+                    filename += ".js";
+
+                Head(source, "/app/controllers/" + filename);
+            }
+        }
+
+        public static void NgDirective(this HtmlHelper source, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                return;
+
+            foreach (var m in name)
+            {
+                var filename = m;
+                if (filename.LastIndexOf(".js") == -1)
+                    filename += ".js";
+
+                Head(source, "/app/directives/" + filename);
+            }
+        }
+
+        public static void NgService(this HtmlHelper source, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                return;
+
+            foreach (var m in name)
+            {
+                var filename = m;
+                if (filename.LastIndexOf(".js") == -1)
+                    filename += ".js";
+
+                Head(source, "/app/services/" + filename);
+            }
+        }
+
+        public static void NgFilter(this HtmlHelper source, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                return;
+
+            foreach (var m in name)
+            {
+                var filename = m;
+                if (filename.LastIndexOf(".js") == -1)
+                    filename += ".js";
+
+                Head(source, "/app/filters/" + filename);
+            }
+        }
+
+        public static void NgResource(this HtmlHelper source, params string[] name)
+        {
+            if (name == null && name.Length == 0)
+                return;
+
+            foreach (var m in name)
+            {
+                var filename = m;
+                if (filename.LastIndexOf(".js") == -1)
+                    filename += ".js";
+
+                Head(source, "/app/resources/" + filename);
+            }
+        }
+
+        public static HtmlString NgTemplate(this HtmlHelper source, string name, string id = "")
+        {
+            if (id == "")
+                id = name;
+
+            var tmp = "";
+            var filename = string.Format("/app/templates/{0}.html", name);
+
+            if (System.IO.File.Exists(filename))
+                tmp = System.IO.File.ReadAllText(filename);
+
+            return new HtmlString(string.Format("<script type=\"text/ng-template\" id=\"{0}\">{1}</script>", id, tmp));
         }
     }
     #endregion
