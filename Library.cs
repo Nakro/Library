@@ -254,10 +254,10 @@ namespace Library
 
     public static class Configuration
     {
-        public delegate void ProblemEventHandler(string source, string message, Uri uri);
-        public delegate void ErrorEventHandler(string source, Exception ex, Uri uri);
-        public delegate void ChangeEventHandler(string source, string message, Uri uri);
-        public delegate void LogEventHandler(string source, string message, Uri uri);
+        public delegate void ProblemEventHandler(string source, string message, Uri uri, string ip);
+        public delegate void ErrorEventHandler(string source, Exception ex, Uri uri, string ip);
+        public delegate void ChangeEventHandler(string source, string message, Uri uri, string ip);
+        public delegate void LogEventHandler(string source, string message, Uri uri, string ip);
         public delegate Authorization AuthorizationDelegate(HttpContextBase context, string roles, string users);
         public delegate ActionResult AuthorizationErrorDelegate(HttpRequestBase request, Authorization authorization);
         public delegate string VersionDelegate(string name);
@@ -455,40 +455,40 @@ namespace Library
                 Analytics = new Library.Others.Analytics();
         }
 
-        public static void InvokeProblem(string source, string message, Uri uri)
+        public static void InvokeProblem(string source, string message, Uri uri, string ip = "")
         {
             if (!AllowProblems)
                 return;
 
             if (Problem != null)
-                Problem(source, message, uri);
+                Problem(source, message, uri, ip);
         }
 
-        public static void InvokeError(string source, Exception error, Uri uri)
+        public static void InvokeError(string source, Exception error, Uri uri, string ip = "")
         {
             if (!AllowErrors)
                 return;
 
             if (Error != null)
-                Error(source, error, uri);
+                Error(source, error, uri, ip);
         }
 
-        public static void InvokeChange(string source, string message, Uri uri)
+        public static void InvokeChange(string source, string message, Uri uri, string ip = "")
         {
             if (!AllowChanges)
                 return;
 
             if (Change != null)
-                Change(source, message, uri);
+                Change(source, message, uri, ip);
         }
 
-        public static void InvokeLog(string source, string message, Uri uri)
+        public static void InvokeLog(string source, string message, Uri uri, string ip = "")
         {
             if (!AllowLogs)
                 return;
 
             if (Log != null)
-                Log(source, message, uri);
+                Log(source, message, uri, ip);
         }
     }
     #endregion
@@ -582,19 +582,19 @@ namespace Library
             Configuration.InvokeProblem(source, message, uri);
         }
 
-        public static void Error(string source, Exception error, Uri uri)
+        public static void Error(string source, Exception error, Uri uri, string ip = "")
         {
-            Configuration.InvokeError(source, error, uri);
+            Configuration.InvokeError(source, error, uri, ip);
         }
 
-        public static void Change(string source, string message, Uri uri)
+        public static void Change(string source, string message, Uri uri, string ip = "")
         {
-            Configuration.InvokeChange(source, message, uri);
+            Configuration.InvokeChange(source, message, uri, ip);
         }
 
-        public static void Log(string source, string message, Uri uri)
+        public static void Log(string source, string message, Uri uri, string ip = "")
         {
-            Configuration.InvokeLog(source, message, uri);
+            Configuration.InvokeLog(source, message, uri, ip);
         }
 
         public static void Compare<T>(IList<T> sourceForm, IList<T> sourceDB, Func<T, T, bool> predicate, Action<T> onAdd, Action<T, T> onUpdate, Action<T> onRemove, bool isNew = false)
@@ -1783,28 +1783,28 @@ namespace Library
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeProblem(source, message, controller.Request.Url);
+            Configuration.InvokeProblem(source, message, controller.Request.Url, controller.Request.UserHostAddress);
         }
 
         public static void Change(this Controller controller, string message, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeChange(source, message, controller.Request.Url);
+            Configuration.InvokeChange(source, message, controller.Request.Url, controller.Request.UserHostAddress);
         }
 
         public static void Log(this Controller controller, string message, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeLog(source, message, controller.Request.Url);
+            Configuration.InvokeLog(source, message, controller.Request.Url, controller.Request.UserHostAddress);
         }
 
         public static void Error(this Controller controller, Exception error, string source = null)
         {
             if (source == null)
                 source = controller.GetType().Name;
-            Configuration.InvokeError(source, error, controller.Request.Url);
+            Configuration.InvokeError(source, error, controller.Request.Url, controller.Request.UserHostAddress);
         }
 
         public static HtmlString RenderToHtmlString(this Controller source, string name, object model)
