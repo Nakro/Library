@@ -95,10 +95,7 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class XhrAttribute : ActionFilterAttribute
     {
-        [DefaultValue(false)]
         public bool HostValid { get; set; }
-
-        [DefaultValue(404)]
         public int HttpStatus { get; set; }
 
         public XhrAttribute()
@@ -120,7 +117,7 @@ namespace Library
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             if (HttpStatus == 0)
-                HttpStatus = 404;
+                HttpStatus = 406;
 
             if (!filterContext.HttpContext.Request.IsAjaxRequest())
                 filterContext.Result = new HttpStatusCodeResult(HttpStatus);
@@ -144,8 +141,6 @@ namespace Library
     {
         public string Name { get; set; }
         public string Value { get; set; }
-
-        [DefaultValue(404)]
         public int HttpStatus { get; set; }
 
         public HeaderAttribute() { }
@@ -166,7 +161,7 @@ namespace Library
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             if (HttpStatus == 0)
-                HttpStatus = 404;
+                HttpStatus = 403;
 
             var value = filterContext.HttpContext.Request.Headers[this.Name];
             if (value != this.Value)
@@ -313,14 +308,16 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class ProxyAttribute : ActionFilterAttribute
     {
-        [DefaultValue(404)]
         public int HttpStatus { get; set; }
         public string Key { get; set; }
         public string Method { get; set; }
 
-        public ProxyAttribute() { }
+        public ProxyAttribute()
+        {
+            HttpStatus = 403;
+        }
 
-        public ProxyAttribute(string key, string method = "POST", int httpStatus = 404)
+        public ProxyAttribute(string key, string method = "POST", int httpStatus = 434)
         {
             this.Key = "Library." + key.Hash("sha256");
             this.Method = "POST";

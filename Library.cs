@@ -210,7 +210,7 @@ namespace Library
         public string Static { get; set; }
     }
 
-    public class ConfigurationCache
+    public static class ConfigurationCache
     {
         public static Type type_nodbparameter = typeof(Library.NoDbParameterAttribute);
         public static Type type_dbskip = typeof(Library.DbSkipAttribute);
@@ -249,9 +249,10 @@ namespace Library
         public static Type type_ulong_null = typeof(ulong?);
         public static Type type_object = typeof(object);
         public static Type type_nullable = typeof(Nullable);
+        public static Type type_dbnull = DBNull.Value.GetType();
     }
 
-    public class Configuration
+    public static class Configuration
     {
         public delegate void ProblemEventHandler(string source, string message, Uri uri);
         public delegate void ErrorEventHandler(string source, Exception ex, Uri uri);
@@ -506,7 +507,7 @@ namespace Library
     // ===============================================================================================
 
     #region Utils
-    public class Utils
+    public static class Utils
     {
         public static double GPS_distance_km(double latitudeA, double longitudeA, double latitudeB, double longitudeB)
         {
@@ -621,13 +622,15 @@ namespace Library
                 {
                     // napr. n.Id == m.Id
                     // update
-                    if (predicate(n, m))
-                    {
-                        existuje = true;
-                        if (onUpdate != null)
-                            onUpdate(n, m);
-                        break;
-                    }
+                    if (!predicate(n, m))
+                        continue;
+
+                    existuje = true;
+
+                    if (onUpdate != null)
+                        onUpdate(n, m);
+
+                    break;
                 }
 
                 if (!existuje)
@@ -639,7 +642,7 @@ namespace Library
                 var existuje = false;
                 foreach (var m in sourceDB)
                 {
-                    if (predicate(n, m))
+                    if (!predicate(n, m))
                     {
                         existuje = true;
                         break;
@@ -685,13 +688,14 @@ namespace Library
                 {
                     // napr. n.Id == m.Id
                     // update
-                    if (predicate(n, m))
-                    {
-                        exists = true;
-                        if (onUpdate != null)
-                            onUpdate(n, m);
-                        break;
-                    }
+                    if (!predicate(n, m))
+                        continue;
+
+                    exists = true;
+                    if (onUpdate != null)
+                        onUpdate(n, m);
+
+                    break;
                 }
 
                 if (!exists)
@@ -1342,22 +1346,24 @@ namespace Library
             {
                 index = s.IndexOf("\\u", index);
 
-                if (index > -1)
+                if (index == -1)
                 {
-                    repeat = true;
-                    var num = s.Substring(index + 2, 4);
-                    try
-                    {
-                        s = s.Insert(index, Convert.ToChar(Convert.ToInt32(num, 16)).ToString());
-                        s = s.Remove(index + 1, 6);
-                    }
-                    catch
-                    {
-                        index++;
-                    }
-                }
-                else
                     repeat = false;
+                    continue;
+                }
+
+                repeat = true;
+                var num = s.Substring(index + 2, 4);
+                try
+                {
+                    s = s.Insert(index, Convert.ToChar(Convert.ToInt32(num, 16)).ToString());
+                    s = s.Remove(index + 1, 6);
+                }
+                catch
+                {
+                    index++;
+                }
+
             }
             return s;
         }
@@ -2338,7 +2344,7 @@ namespace Library
             content.ContentType = contentType;
             content.ContentEncoding = System.Text.Encoding.UTF8;
 
-            // Solved: problem with Safari
+            // Solves problem with Safari
             HttpContext.Current.Response.Cache.SetCacheability(HttpCacheability.NoCache);
 
             return content;
@@ -2371,7 +2377,7 @@ namespace Library
         public static string Hash(this string source, string type, string salt = "", Encoding encoding = null)
         {
             if (string.IsNullOrEmpty(source))
-                return "";
+                return string.Empty;
 
             if (type.Equals("sha1", StringComparison.InvariantCultureIgnoreCase))
             {
@@ -2381,7 +2387,7 @@ namespace Library
                         encoding = Encoding.UTF8;
 
                     var data = encoding.GetBytes(source + salt);
-                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", string.Empty);
                 }
             }
 
@@ -2393,7 +2399,7 @@ namespace Library
                         encoding = Encoding.UTF8;
 
                     var data = encoding.GetBytes(source + salt);
-                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", string.Empty);
                 }
             }
 
@@ -2405,7 +2411,7 @@ namespace Library
                         encoding = Encoding.UTF8;
 
                     var data = encoding.GetBytes(source + salt);
-                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", string.Empty);
                 }
             }
 
@@ -2417,7 +2423,7 @@ namespace Library
                         encoding = Encoding.UTF8;
 
                     var data = encoding.GetBytes(source + salt);
-                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", "");
+                    return BitConverter.ToString(crypto.ComputeHash(data)).Replace("-", string.Empty);
                 }
             }
 
@@ -2511,13 +2517,16 @@ namespace Library
             {
                 if (withoutProperty != null && withoutProperty.Length > 0 && withoutProperty.Contains(p.Name))
                     return;
-                if (p.PropertyType == ConfigurationCache.type_string)
-                {
-                    var v = p.GetValue(o, null);
-                    if (v == null)
-                        return;
-                    p.SetValue(o, v.ToString().Trim(), null);
-                }
+
+                if (p.PropertyType != ConfigurationCache.type_string)
+                    return;
+
+                var v = p.GetValue(o, null);
+                if (v == null)
+                    return;
+
+                p.SetValue(o, v.ToString().Trim(), null);
+
             });
         }
 
@@ -2531,13 +2540,15 @@ namespace Library
                 if (p.PropertyType != ConfigurationCache.type_string)
                     return;
 
-                if (property.Contains(p.Name))
-                {
-                    var v = p.GetValue(o, null);
-                    if (v == null)
-                        return;
-                    p.SetValue(o, v.ToString().UpperLower(0), null);
-                }
+                if (!property.Contains(p.Name))
+                    return;
+
+                var v = p.GetValue(o, null);
+                if (v == null)
+                    return;
+
+                p.SetValue(o, v.ToString().UpperLower(0), null);
+
             });
         }
 
@@ -2576,13 +2587,11 @@ namespace Library
                         return false;
                 return true;
             }
-            else
-            {
-                foreach (string i in value)
-                    if (source.Contains(i))
-                        return true;
-                return false;
-            }
+
+            foreach (string i in value)
+                if (source.Contains(i))
+                    return true;
+            return false;
         }
 
         public static bool Contains<T>(this IList<T> source, bool allMustExist, params T[] value)
@@ -2596,13 +2605,12 @@ namespace Library
                 }
                 return true;
             }
-            else
-            {
-                foreach (T i in value)
-                    if (source.Contains(i))
-                        return true;
-                return false;
-            }
+
+            foreach (T i in value)
+                if (source.Contains(i))
+                    return true;
+
+            return false;
         }
 
         public static string RegExReplace(this string source, string pattern, string replaceTo)
@@ -2656,7 +2664,7 @@ namespace Library
         public static StringBuilder AppendConfiguration(this StringBuilder source, string name, object value, int padding = 15)
         {
             if (source.Length > 0 && source[source.Length - 1] != '\n')
-                source.Append("\n");
+                source.Append('\n');
 
             return source.Append(string.Format("{0}: {1}", name.PadRight(padding, ' '), value));
         }
@@ -2672,9 +2680,9 @@ namespace Library
         public static StringBuilder AppendParam(this StringBuilder source, string name, object value)
         {
             if (source.Length > 0)
-                source.Append("&");
+                source.Append('&');
 
-            return source.Append(name).Append('=').Append(value == null ? "" : value.ToString().UrlEncode());
+            return source.Append(name).Append('=').Append(value == null ? string.Empty : value.ToString().UrlEncode());
         }
 
         public static StringBuilder AppendAttribute(this StringBuilder source, string param, object value)
@@ -2682,14 +2690,14 @@ namespace Library
             if (source.Length > 0)
                 source.Append(' ');
 
-            return source.Append(param).Append("=\"").Append(value == null ? "" : value.ToString().HtmlEncode()).Append('\"');
+            return source.Append(param).Append("=\"").Append(value == null ? string.Empty : value.ToString().HtmlEncode()).Append('\"');
         }
 
         public static StringBuilder AppendStyle(this StringBuilder source, string param, object value)
         {
             if (source.Length > 0)
-                source.Append(";");
-            return source.Append(param).Append(":").Append(value);
+                source.Append(';');
+            return source.Append(param).Append(':').Append(value);
         }
 
         public static string RSS(this DateTime source)
@@ -2700,6 +2708,7 @@ namespace Library
         public static T FindId<T>(this string source, bool fromBeg = true, char divider = '-')
         {
             var index = 0;
+
             if (fromBeg)
             {
                 index = source.IndexOf(divider);
@@ -2715,6 +2724,7 @@ namespace Library
                     return source.Substring(index, source.Length - index).To<T>();
                 }
             }
+
             return default(T);
         }
 
@@ -4014,7 +4024,7 @@ namespace Library
     // ===============================================================================================
 
     #region Scheduler
-    public class Scheduler
+    public static class Scheduler
     {
         public class Schedule
         {
@@ -5075,7 +5085,7 @@ namespace Library
     // ===============================================================================================
 
     #region EncryptDecrypt
-    public sealed class EncryptDecrypt
+    public static class EncryptDecrypt
     {
         public static bool ValidateHash(string key, string hash, string data)
         {
@@ -5425,7 +5435,7 @@ namespace Library
     // ===============================================================================================
 
     #region Sitemap
-    public class Sitemap
+    public static class Sitemap
     {
         private const string ID = "$sitemap";
 

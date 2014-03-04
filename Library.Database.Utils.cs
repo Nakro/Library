@@ -309,9 +309,9 @@ namespace Library.DatabaseUtils
             }
 
             if (string.IsNullOrEmpty(schema))
-                return name;
+                return '[' + name + ']';
 
-            return schema + '.' + name;
+            return '[' + schema + "].[" + name + ']';
         }
 
         public static SqlDbType ToType(Type type)

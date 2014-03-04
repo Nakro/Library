@@ -642,19 +642,19 @@ namespace Library.Json
 
                 var nazov = attr.Item1;
 
-                if (!p.PropertyType.IsClass)
-                {
-                    if (p.PropertyType.GetInterface("IEnumerable") != null)
-                        WriteClass(sb, div, nazov, p.GetValue(value, null));
-                    else
-                        WriteStruct(sb, div, nazov, p.GetValue(value, null));
-                }
-                else
+                if (p.PropertyType.IsClass)
                 {
                     if (p.PropertyType == ConfigurationCache.type_string)
                         WriteString(sb, div, nazov, p.GetValue(value, null));
                     else
                         WriteClass(sb, div, nazov, p.GetValue(value, null));
+                }
+                else
+                {
+                    if (p.PropertyType.GetInterface("IEnumerable") != null)
+                        WriteClass(sb, div, nazov, p.GetValue(value, null));
+                    else
+                        WriteStruct(sb, div, nazov, p.GetValue(value, null));
                 }
 
                 if (!div)

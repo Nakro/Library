@@ -28,5 +28,8 @@
 - updated: ImageConverter (supports stream)
 - updated: MarkDown parser
 - updated: JSON serializer / deserializer
+- updated: Library.Database
 
 - renamed: Utils.Log() -> Utils.LogFile()
+
+- clean code

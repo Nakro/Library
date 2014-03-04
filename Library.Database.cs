@@ -42,6 +42,7 @@ namespace Library
         IDatabase DB { get; }
 
         IList<string> Columns { get; }
+        string PrimaryKey { get; }
 
         bool AutoLocking { get; set; }
 
@@ -52,8 +53,8 @@ namespace Library
         object Scalar(string sql, object arg);
         object Scalar(string columnName, SqlBuilder builder);
 
-        IEnumerable<T> Reader(string sql, bool singleRow = false);
-        IEnumerable<T> Reader(string sql, object arg, bool singleRow = false);
+        IEnumerable<T> Reader(string sql, bool singleRow = false, int skip = 0, int tak = 0);
+        IEnumerable<T> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int tak = 0);
 
         IEnumerable<T> GetAll(params OrderBy[] orderBy);
         IEnumerable<T> GetAll(string[] disabledPropertyName, params OrderBy[] orderBy);
@@ -104,8 +105,8 @@ namespace Library
         int Execute(string sql, object arg);
         object Scalar(string sql);
         object Scalar(string sql, object arg);
-        IEnumerable<dynamic> Reader(string sql, bool singleRow = false);
-        IEnumerable<dynamic> Reader(string sql, object arg, bool singleRow = false);
+        IEnumerable<dynamic> Reader(string sql, bool singleRow = false, int skip = 0, int take = 0);
+        IEnumerable<dynamic> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int take = 0);
         bool ReaderBinary(string sql, object arg, Action<byte[]> onReadBinary);
         bool ReaderBinary(string sql, Action<byte[]> onReadBinary);
         void ReaderMultiple(string sql, object arg, Func<int, dynamic, ReaderCursor> onRead);
@@ -139,7 +140,10 @@ namespace Library
         void TransactionCommit();
     }
 
-    public interface IDatabase : ICommand, ITransaction { }
+    public interface IDatabase : ICommand, ITransaction
+    {
+        int Version { get; }
+    }
     #endregion
 
     #region Attributes
@@ -316,7 +320,7 @@ namespace Library
         public SqlBuilder AppendSql(string sql, params object[] values)
         {
             if (values != null && values.Length > 0)
-                sb.Append(string.Format(System.Globalization.CultureInfo.InvariantCulture, sql, values));
+                sb.Append(string.Format(Configuration.InvariantCulture, sql, values));
             else
                 sb.Append(sql);
             return this;
@@ -333,7 +337,7 @@ namespace Library
             if (string.IsNullOrEmpty(sql))
                 return this;
 
-            param.Value.Add(new Parameter(parameterName, (value == null ? DBNull.Value.GetType() : value.GetType()), value, 0, null));
+            param.Value.Add(new Parameter(parameterName, (value == null ? ConfigurationCache.type_dbnull : value.GetType()), value, 0, null));
             sb.Append(sql);
 
             return this;
@@ -341,7 +345,7 @@ namespace Library
 
         public SqlBuilder AppendParameter(string parameterName, object value)
         {
-            param.Value.Add(new Parameter(parameterName, (value == null ? DBNull.Value.GetType() : value.GetType()), value, 0, null));
+            param.Value.Add(new Parameter(parameterName, (value == null ? ConfigurationCache.type_dbnull : value.GetType()), value, 0, null));
             return this;
         }
 
@@ -390,8 +394,7 @@ namespace Library
         {
             if (this.HasValue)
                 return (appendWhere ? " WHERE " : "") + this.ToString();
-            else
-                return "";
+            return "";
         }
     }
     #endregion
@@ -442,9 +445,24 @@ namespace Library
         }
     }
 
+    public class DatabaseColumns
+    {
+        public StringBuilder Clean { get; set; }
+        public StringBuilder Raw { get; set; }
+        public string OrderBy { get; set; }
+    }
+
     public class Database : IConnection<Database>, IDatabase, IDisposable
     {
         public bool IsOpened { get; private set; }
+
+        public int Version
+        {
+            get
+            {
+                return connection.ServerVersion.Substring(0, connection.ServerVersion.IndexOf('.')).To<int>();
+            }
+        }
 
         private SqlCommand cmd = null;
         private string _sql = "";
@@ -780,26 +798,29 @@ namespace Library
             using (var reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
             {
                 var has = reader.HasRows;
-                if (has)
+                if (!has)
                 {
-                    while (reader.Read())
+                    reader.Close();
+                    return has;
+                }
+
+                while (reader.Read())
+                {
+                    var bufferSize = 1024;
+                    var buffer = new byte[bufferSize];
+                    long readBytes = 0;
+                    long readIndex = 0;
+                    readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
+
+                    while (readBytes == bufferSize)
                     {
-                        var bufferSize = 1024;
-                        var buffer = new byte[bufferSize];
-                        long readBytes = 0;
-                        long readIndex = 0;
-                        readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
-
-                        while (readBytes == bufferSize)
-                        {
-                            onReadBinary(buffer);
-                            readIndex += bufferSize;
-                            readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
-                        }
-
                         onReadBinary(buffer);
-                        break;
+                        readIndex += bufferSize;
+                        readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
                     }
+
+                    onReadBinary(buffer);
+                    break;
                 }
 
                 reader.Close();
@@ -899,7 +920,6 @@ namespace Library
                             p.Type = SqlDbType.VarChar;
 
                         v.Value = p.Value == null ? "null" : Configuration.JsonProvider.Serialize(p.Value);
-
                     }
                     else
                         v.Value = (p.Value == null ? DBNull.Value : p.Value);
@@ -960,8 +980,8 @@ namespace Library
                 }
                 else
                 {
-                    // neviem na čo tu je?
-                    //param.Size = p.Size;
+                    // TODO: neviem na čo to tu je
+                    // param.Size = p.Size;
                     param.Value = (p.Value == null ? DBNull.Value : p.Value);
                 }
             }
@@ -1043,13 +1063,19 @@ namespace Library
             return db.ReaderBinary(sql, null, onReadBinary);
         }
 
-        public IEnumerable<dynamic> Reader(string sql, bool singleRow = false)
+        public IEnumerable<dynamic> Reader(string sql, bool singleRow = false, int skip = 0, int take = 0)
         {
-            return Reader(sql, null, singleRow);
+            return Reader(sql, null, singleRow, skip, take);
         }
 
-        public IEnumerable<dynamic> Reader(string sql, object arg, bool singleRow = false)
+        public IEnumerable<dynamic> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int take = 0)
         {
+            if (skip > 0 || take > 0)
+            {
+                if (DB.Version < 11)
+                    throw new Exception("SQL Server doesn't support effective pagination.");
+                sql += string.Format(" OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY", skip, take);
+            }
             return db.ReaderEnumerator(sql, Parameter.CreateFromObject(arg), singleRow);
         }
 
@@ -1153,13 +1179,20 @@ namespace Library
             return db.Scalar(sql, Parameter.CreateFromObject(arg));
         }
 
-        public IEnumerable<T> Reader(string sql, bool singleRow = false)
+        public IEnumerable<T> Reader(string sql, bool singleRow = false, int skip = 0, int take = 0)
         {
-            return Reader(sql, null, singleRow);
+            return Reader(sql, null, singleRow, skip, take);
         }
 
-        public IEnumerable<T> Reader(string sql, object arg, bool singleRow = false)
+        public IEnumerable<T> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int take = 0)
         {
+            if (skip > 0 || take > 0)
+            {
+                if (DB.Version < 11)
+                    throw new Exception("SQL Server doesn't support effective pagination.");
+                sql += string.Format(" OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY", skip, take);
+            }
+
             return ReaderParam(sql, Parameter.CreateFromObject(arg), singleRow);
         }
 
@@ -1180,18 +1213,19 @@ namespace Library
 
         public object Scalar(string columnName, SqlBuilder builder)
         {
-            return db.Scalar(string.Format("SELECT {0} FROM {1}{2}", columnName, GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : ""), builder.Parameters);
+            return db.Scalar(string.Format("SELECT {0} FROM {1}{2}", columnName, GetTableNameSelect, builder.ToString(true)), builder.Parameters);
         }
 
         public R Scalar<R>(string columnName, SqlBuilder builder)
         {
-            return Utils.To<R>(db.Scalar(string.Format("SELECT {0} FROM {1}{2}", columnName, GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : ""), builder.Parameters));
+            return Utils.To<R>(db.Scalar(string.Format("SELECT {0} FROM {1}{2}", columnName, GetTableNameSelect, builder.ToString(true)), builder.Parameters));
         }
 
         public T FindByPK(object primaryKey, params string[] disablePropertyName)
         {
             var sb = new System.Text.StringBuilder();
-            var p = "";
+            string p = null;
+
             foreach (var s in columns)
             {
                 if (!s.Select && !s.PrimaryKey)
@@ -1200,7 +1234,7 @@ namespace Library
                 if (disablePropertyName.Contains(s.DbName) || disablePropertyName.Contains(s.Name))
                     continue;
 
-                sb.Append((sb.Length > 0 ? "," : "") + (string.IsNullOrEmpty(s.Raw) ? s.DbName : s.Raw + " As " + s.DbName));
+                sb.Append((sb.Length > 0 ? "," : "") + (string.IsNullOrEmpty(s.Raw) ? s.DbName : s.Raw + " AS " + s.DbName));
                 if (s.PrimaryKey)
                     p = s.DbName;
             }
@@ -1213,7 +1247,7 @@ namespace Library
 
         public IEnumerable<T> GetAll(params OrderBy[] orderBy)
         {
-            return Reader(string.Format("SELECT {0} FROM {1} {2}", GetColumns(), GetTableNameSelect, OrderByCreate(orderBy)));
+            return GetAll(null, orderBy);
         }
 
         public IEnumerable<T> GetAll(string[] disablePropertyName, params OrderBy[] orderBy)
@@ -1223,7 +1257,7 @@ namespace Library
 
         public IEnumerable<T> GetAll(int top, params OrderBy[] orderBy)
         {
-            return Reader(string.Format("SELECT TOP {3} {0} FROM {1} {2}", GetColumns(), GetTableNameSelect, OrderByCreate(orderBy), top), top == 1);
+            return GetAll(top, null, orderBy);
         }
 
         public IEnumerable<T> GetAll(int top, string[] disablePropertyName, params OrderBy[] orderBy)
@@ -1233,61 +1267,68 @@ namespace Library
 
         public IEnumerable<T> GetAll(int skip, int take, params OrderBy[] orderBy)
         {
-            var r = GetColumns(OrderByCreate(orderBy, true));
-            return Reader(string.Format("SELECT TOP {0} {5} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {3}) As rowindex, {1} FROM {2}) As _query WHERE _query.rowindex>{4} ORDER BY _query.rowindex", take, r.Item1.ToString(), GetTableNameSelect, r.Item3, skip, r.Item2.ToString()));
+            return GetAll(skip, take, null, orderBy);
         }
 
         public IEnumerable<T> GetAll(int skip, int take, string[] disablePropertyName, params OrderBy[] orderBy)
         {
             var r = GetColumns(OrderByCreate(orderBy, true), disablePropertyName);
-            return Reader(string.Format("SELECT TOP {0} {5} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {3}) As rowindex, {1} FROM {2}) As _query WHERE _query.rowindex>{4} ORDER BY _query.rowindex", take, r.Item1.ToString(), GetTableNameSelect, r.Item3, skip, r.Item2.ToString()));
+
+            if (this.db.Version > 10)
+                return Reader(string.Format("SELECT {0} FROM {1} ORDER BY {2} OFFSET {3} ROWS FETCH NEXT {4} ROWS ONLY", r.Raw.ToString(), GetTableNameSelect, r.OrderBy, skip, take));
+
+            return Reader(string.Format("SELECT TOP {0} {5} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {3}) As rowindex, {1} FROM {2}) As _query WHERE _query.rowindex>{4} ORDER BY _query.rowindex", take, r.Clean.ToString(), GetTableNameSelect, r.OrderBy, skip, r.Raw.ToString()));
         }
 
         public IEnumerable<T> FindAll(SqlBuilder builder, params OrderBy[] orderBy)
         {
-            return ReaderParam(string.Format("SELECT {0} FROM {1}{2} {3}", GetColumns(), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", OrderByCreate(orderBy)), builder.Parameters);
-        }
-
-        public IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, params OrderBy[] orderBy)
-        {
-            var r = GetColumns(OrderByCreate(orderBy, true));
-            var sql = string.Format("SELECT TOP {0} {6} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {2}) As rowindex, {1} FROM {3}{4}) As _query WHERE _query.rowindex>{5} ORDER BY _query.rowindex", take, r.Item1.ToString(), r.Item3, GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", skip, r.Item2.ToString());
-            return ReaderParam(sql, builder.Parameters);
+            return FindAll(builder, null, orderBy);
         }
 
         public IEnumerable<T> FindAll(SqlBuilder builder, string[] disablePropertyName, params OrderBy[] orderBy)
         {
-            return ReaderParam(string.Format("SELECT {0} FROM {1}{2} {3}", GetColumns(disablePropertyName), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", OrderByCreate(orderBy)), builder.Parameters);
+            return ReaderParam(string.Format("SELECT {0} FROM {1}{2} {3}", GetColumns(disablePropertyName), GetTableNameSelect, builder.ToString(true), OrderByCreate(orderBy)), builder.Parameters);
+        }
+
+        public IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, params OrderBy[] orderBy)
+        {
+            return FindAll(builder, skip, take, null, orderBy);
         }
 
         public IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, string[] disablePropertyName, params OrderBy[] orderBy)
         {
             var r = GetColumns(OrderByCreate(orderBy, true), disablePropertyName);
-            var sql = string.Format("SELECT TOP {0} {6} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {2}) As rowindex, {1} FROM {3}{4}) As _query WHERE _query.rowindex>{5} ORDER BY _query.rowindex", take, r.Item1.ToString(), r.Item3, GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", skip, r.Item2.ToString());
+            string sql = null;
+
+            // SQL Server 2012
+            if (this.db.Version > 10)
+                sql = string.Format("SELECT {0} FROM {1}{2} ORDER BY {3} OFFSET {4} ROWS FETCH NEXT {5} ROWS ONLY", r.Raw.ToString(), GetTableNameSelect, builder.ToString(true), r.OrderBy, skip, take);
+            else
+                sql = string.Format("SELECT TOP {0} {6} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {2}) As rowindex, {1} FROM {3}{4}) As _query WHERE _query.rowindex>{5} ORDER BY _query.rowindex", take, r.Clean.ToString(), r.OrderBy, GetTableNameSelect, builder.ToString(true), skip, r.Raw.ToString());
+
             return ReaderParam(sql, builder.Parameters);
         }
 
         public IEnumerable<T> FindTop(int top, SqlBuilder builder, params OrderBy[] orderBy)
         {
-            var sql = string.Format("SELECT TOP {3} {0} FROM {1}{2} {4}", GetColumns(), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", top, OrderByCreate(orderBy));
+            var sql = string.Format("SELECT TOP {3} {0} FROM {1}{2} {4}", GetColumns(), GetTableNameSelect, builder.ToString(true), top, OrderByCreate(orderBy));
             return ReaderParam(sql, builder.Parameters, top == 1);
         }
 
         public IEnumerable<T> FindTop(int top, SqlBuilder builder, string[] disablePropertyName, params OrderBy[] orderBy)
         {
-            var sql = string.Format("SELECT TOP {3} {0} FROM {1}{2} {4}", GetColumns(disablePropertyName), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", top, OrderByCreate(orderBy));
+            var sql = string.Format("SELECT TOP {3} {0} FROM {1}{2} {4}", GetColumns(disablePropertyName), GetTableNameSelect, builder.ToString(true), top, OrderByCreate(orderBy));
             return ReaderParam(sql, builder.Parameters, top == 1);
         }
 
         public T FindOne(SqlBuilder builder, params OrderBy[] orderBy)
         {
-            var sql = string.Format("SELECT TOP 1 {0} FROM {1}{2} {3}", GetColumns(), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", OrderByCreate(orderBy));
-            return ReaderParam(sql, builder.Parameters, true).FirstOrDefault();
+            return FindOne(builder, null, orderBy);
         }
 
         public T FindOne(SqlBuilder builder, string[] disablePropertyName, params OrderBy[] orderBy)
         {
-            var sql = string.Format("SELECT TOP 1 {0} FROM {1}{2} {3}", GetColumns(disablePropertyName), GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : "", OrderByCreate(orderBy));
+            var sql = string.Format("SELECT TOP 1 {0} FROM {1}{2} {3}", GetColumns(disablePropertyName), GetTableNameSelect, builder.ToString(true), OrderByCreate(orderBy));
             return ReaderParam(sql, builder.Parameters, true).FirstOrDefault();
         }
 
@@ -1303,7 +1344,7 @@ namespace Library
 
         public int Count(SqlBuilder builder)
         {
-            return Convert.ToInt32(db.Scalar(string.Format("SELECT COUNT(*) FROM {0}{1}", GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : ""), builder.Parameters));
+            return Convert.ToInt32(db.Scalar(string.Format("SELECT COUNT(*) FROM {0}{1}", GetTableNameSelect, builder.ToString(true)), builder.Parameters));
         }
 
         public bool Exists()
@@ -1313,7 +1354,7 @@ namespace Library
 
         public bool Exists(SqlBuilder builder)
         {
-            return Convert.ToInt32(db.Scalar(string.Format("SELECT COUNT(*) FROM {0}{1}", GetTableNameSelect, builder.HasValue ? " WHERE " + builder.ToString() : ""), builder.Parameters)) > 0;
+            return Convert.ToInt32(db.Scalar(string.Format("SELECT COUNT(*) FROM {0}{1}", GetTableNameSelect, builder.ToString(true)), builder.Parameters)) > 0;
         }
 
         public int Update(object arg, params string[] disablePropertyName)
@@ -1347,14 +1388,21 @@ namespace Library
 
         public int Update(string where, object arg, object whereArg, params string[] disablePropertyName)
         {
-            var hodnoty = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
             var disabled = new Lazy<List<string>>();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
                 if (!disablePropertyName.Contains(s.Name) && s.Update)
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + s.DbName + "=@" + s.DbName);
-                else if (!s.PrimaryKey)
+                {
+                    if (isFilled)
+                        values.Append(',');
+                    values.Append('[' + s.DbName + "]=@" + s.DbName);
+                    continue;
+                }
+
+                if (!s.PrimaryKey)
                     disabled.Value.Add(s.Name);
             }
 
@@ -1368,20 +1416,27 @@ namespace Library
             else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
-            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), where);
+            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), where);
             return db.Execute(sql, p);
         }
 
         public int Update(SqlBuilder builder, object arg, params string[] disablePropertyName)
         {
-            var hodnoty = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
             var disabled = new Lazy<List<string>>();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
                 if (!disablePropertyName.Contains(s.Name) && s.Update)
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + s.DbName + "=@" + s.DbName);
-                else if (!s.PrimaryKey)
+                {
+                    if (isFilled)
+                        values.Append(',');
+                    values.Append('[' + s.DbName + "]=@" + s.DbName);
+                    continue;
+                }
+
+                if (!s.PrimaryKey)
                     disabled.Value.Add(s.Name);
             }
 
@@ -1389,7 +1444,7 @@ namespace Library
             p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
             p.AddRange(builder.Parameters);
 
-            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, hodnoty.ToString(), builder.HasValue ? " WHERE " + builder.ToString() : "");
+            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values.ToString(), builder.ToString(true));
             return db.Execute(sql, p);
         }
 
@@ -1397,12 +1452,13 @@ namespace Library
         {
 
             if (propertyName == null || propertyName.Length == 0)
-                throw new Exception("You must define a property name");
+                throw new Exception("You must define names of property.");
 
-            var hodnoty = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
             Column pk = null;
 
             var disabled = new Lazy<List<string>>();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
@@ -1410,18 +1466,26 @@ namespace Library
                     pk = s;
 
                 if (propertyName.Contains(s.Name) && s.Update)
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + s.DbName + "=@" + s.DbName);
-                else if (!s.PrimaryKey)
+                {
+                    if (isFilled)
+                        values.Append(',');
+
+                    isFilled = true;
+                    values.Append('[' + s.DbName + "]=@" + s.DbName);
+                    continue;
+                }
+
+                if (!s.PrimaryKey)
                     disabled.Value.Add(s.Name);
             }
 
-            if (hodnoty.Length == 0)
-                throw new Exception("You must define a property name");
+            if (values.Length == 0)
+                throw new Exception("You must define names of property.");
 
             if (pk == null)
                 throw new Exception("Primary key is not implemented.");
 
-            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), pk.DbName + "=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
+            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), '[' + pk.DbName + "]=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
         }
 
         public int UpdateOnly(string where, object arg, params string[] propertyName)
@@ -1432,21 +1496,30 @@ namespace Library
         public int UpdateOnly(string where, object arg, object whereArg, params string[] propertyName)
         {
             if (propertyName == null || propertyName.Length == 0)
-                throw new Exception("You must define a property name");
+                throw new Exception("You must define names of property.");
 
-            var hodnoty = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
             var disabled = new Lazy<List<string>>();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
                 if (propertyName.Contains(s.Name) && s.Update)
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + s.DbName + "=@" + s.DbName);
-                else if (!s.PrimaryKey)
+                {
+                    if (isFilled)
+                        values.Append(',');
+
+                    isFilled = true;
+                    values.Append('[' + s.DbName + "]=@" + s.DbName);
+                    continue;
+                }
+
+                if (!s.PrimaryKey)
                     disabled.Value.Add(s.Name);
             }
 
-            if (hodnoty.Length == 0)
-                throw new Exception("You must define a property name");
+            if (values.Length == 0)
+                throw new Exception("You must define names of property.");
 
             var p = new List<Parameter>(10);
 
@@ -1458,34 +1531,43 @@ namespace Library
             else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
-            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), where);
+            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), where);
             return db.Execute(sql, p);
         }
 
         public int UpdateOnly(SqlBuilder builder, object arg, params string[] propertyName)
         {
             if (propertyName == null || propertyName.Length == 0)
-                throw new Exception("You must define a property name");
+                throw new Exception("You must define names of property.");
 
-            var hodnoty = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
             var disabled = new Lazy<List<string>>();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
                 if (propertyName.Contains(s.Name) && s.Update)
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + s.DbName + "=@" + s.DbName);
-                else if (!s.PrimaryKey)
+                {
+                    if (isFilled)
+                        values.Append(',');
+
+                    isFilled = true;
+                    values.Append('[' + s.DbName + "]=@" + s.DbName);
+                    continue;
+                }
+
+                if (!s.PrimaryKey)
                     disabled.Value.Add(s.Name);
             }
 
-            if (hodnoty.Length == 0)
-                throw new Exception("You must define a property name");
+            if (values.Length == 0)
+                throw new Exception("You must define names of property.");
 
             var p = new List<Parameter>(10);
             p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
             p.AddRange(builder.Parameters);
 
-            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, hodnoty.ToString(), builder.HasValue ? " WHERE " + builder.ToString() : "");
+            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values.ToString(), builder.ToString(true));
             return db.Execute(sql, p);
         }
 
@@ -1498,8 +1580,9 @@ namespace Library
 
         public object Insert(object arg, params string[] disablePropertyName)
         {
-            var stlpce = new System.Text.StringBuilder();
-            var hodnoty = new System.Text.StringBuilder();
+            var column = new System.Text.StringBuilder();
+            var values = new System.Text.StringBuilder();
+            var isFilled = false;
 
             Column pk = null;
 
@@ -1510,49 +1593,100 @@ namespace Library
 
                 if (!disablePropertyName.Contains(s.Name) && s.Insert)
                 {
-                    stlpce.Append((stlpce.Length > 0 ? "," : "") + s.DbName);
-                    hodnoty.Append((hodnoty.Length > 0 ? "," : "") + "@" + s.DbName);
+                    if (isFilled)
+                    {
+                        column.Append(',');
+                        values.Append(',');
+                    }
+
+                    column.Append(s.DbName);
+                    values.Append("@" + s.DbName);
                 }
             }
 
-            var sql = string.Format("INSERT INTO {0} ({1}) VALUES({2}); SELECT @@IDENTITY", GetTableNameUpdate, stlpce.ToString(), hodnoty.ToString());
+            var sql = string.Format("INSERT INTO {0} ({1}) VALUES({2}); SELECT @@IDENTITY", GetTableNameUpdate, column.ToString(), values.ToString());
 
             var v = Scalar(sql, arg);
 
-            if (pk != null)
-            {
-                var prop = arg.GetType().GetProperty(pk.Name);
-                var t = prop.PropertyType;
+            if (pk == null)
+                return v;
 
-                if (v == DBNull.Value && (pk.Insert || pk.Update))
-                    v = prop.GetValue(arg, null);
-                if (t == ConfigurationCache.type_int)
-                    prop.SetValue(arg, Convert.ToInt32(v), null);
-                else if (t == ConfigurationCache.type_byte)
-                    prop.SetValue(arg, Convert.ToByte(v), null);
-                else if (t == ConfigurationCache.type_decimal)
-                    prop.SetValue(arg, Convert.ToDecimal(v), null);
-                else if (t == ConfigurationCache.type_guid)
-                    prop.SetValue(arg, (Guid)v, null);
-                else if (t == ConfigurationCache.type_short)
-                    prop.SetValue(arg, Convert.ToInt16(v), null);
-                else if (t == ConfigurationCache.type_long)
-                    prop.SetValue(arg, Convert.ToInt64(v), null);
-                else if (t == ConfigurationCache.type_double)
-                    prop.SetValue(arg, Convert.ToDouble(v), null);
-                else if (t == ConfigurationCache.type_float)
-                    prop.SetValue(arg, Convert.ToSingle(v), null);
-                else if (t == ConfigurationCache.type_uint)
-                    prop.SetValue(arg, Convert.ToUInt32(v), null);
-                else if (t == ConfigurationCache.type_ushort)
-                    prop.SetValue(arg, Convert.ToUInt16(v), null);
-                else if (t == ConfigurationCache.type_long)
-                    prop.SetValue(arg, Convert.ToUInt64(v), null);
-                else if (t == ConfigurationCache.type_string)
-                {
-                    if (v != DBNull.Value)
-                        prop.SetValue(arg, (string)v, null);
-                }
+            var prop = arg.GetType().GetProperty(pk.Name);
+            var t = prop.PropertyType;
+
+            if (v == DBNull.Value && (pk.Insert || pk.Update))
+                v = prop.GetValue(arg, null);
+
+            if (t == ConfigurationCache.type_int)
+            {
+                prop.SetValue(arg, Convert.ToInt32(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_byte)
+            {
+                prop.SetValue(arg, Convert.ToByte(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_decimal)
+            {
+                prop.SetValue(arg, Convert.ToDecimal(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_guid)
+            {
+                prop.SetValue(arg, (Guid)v, null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_short)
+            {
+                prop.SetValue(arg, Convert.ToInt16(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_long)
+            {
+                prop.SetValue(arg, Convert.ToInt64(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_double)
+            {
+                prop.SetValue(arg, Convert.ToDouble(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_float)
+            {
+                prop.SetValue(arg, Convert.ToSingle(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_uint)
+            {
+                prop.SetValue(arg, Convert.ToUInt32(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_ushort)
+            {
+                prop.SetValue(arg, Convert.ToUInt16(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_long)
+            {
+                prop.SetValue(arg, Convert.ToUInt64(v), null);
+                return v;
+            }
+
+            if (t == ConfigurationCache.type_string)
+            {
+                if (v != DBNull.Value)
+                    prop.SetValue(arg, (string)v, null);
             }
 
             return v;
@@ -1585,45 +1719,61 @@ namespace Library
 
         public int Delete(SqlBuilder builder)
         {
-            var sql = string.Format("DELETE FROM {0}{1}", GetTableNameUpdate, builder.HasValue ? " WHERE " + builder.ToString() : "");
+            var sql = string.Format("DELETE FROM {0}{1}", GetTableNameUpdate, builder.ToString(true));
             return db.Execute(sql, builder.Parameters);
         }
 
-        private Tuple<StringBuilder, StringBuilder, string> GetColumns(string orderBy, params string[] disablePropertyName)
+        private DatabaseColumns GetColumns(string orderBy, params string[] disablePropertyName)
         {
-            var sb = new System.Text.StringBuilder();
-            var sb2 = new System.Text.StringBuilder();
-            var cn = orderBy;
+            var r = new DatabaseColumns();
+            r.Clean = new StringBuilder();
+            r.Raw = new StringBuilder();
+            r.OrderBy = orderBy;
+
+            var table = this.TableName + '.';
 
             foreach (var s in columns)
             {
                 if (!s.Select)
                     continue;
 
-                if (disablePropertyName.Contains(s.DbName) || disablePropertyName.Contains(s.Name))
+                if (disablePropertyName != null && (disablePropertyName.Contains(s.DbName) || disablePropertyName.Contains(s.Name)))
                     continue;
 
-                if (cn == "")
-                    cn = s.DbName;
+                if (string.IsNullOrEmpty(r.OrderBy))
+                    r.OrderBy = table + '[' + s.DbName + ']';
 
-                sb2.Append((sb2.Length > 0 ? "," : "") + s.DbName);
-                sb.Append((sb.Length > 0 ? "," : "") + (string.IsNullOrEmpty(s.Raw) ? s.DbName : s.Raw + " AS " + s.DbName));
+                if (r.Raw.Length > 0)
+                    r.Raw.Append(',');
+
+                if (r.Clean.Length > 0)
+                    r.Clean.Append(',');
+
+                r.Clean.Append(table + '[' + s.DbName + ']');
+                r.Raw.Append(string.IsNullOrEmpty(s.Raw) ? '[' + s.DbName + ']' : s.Raw + " AS " + table + '[' + s.DbName + ']');
             }
 
-            return new Tuple<StringBuilder, StringBuilder, string>(sb, sb2, cn);
+            return r;
         }
 
         private StringBuilder GetColumns(params string[] disablePropertyName)
         {
             var sb = new System.Text.StringBuilder();
+            var isFilled = false;
 
             foreach (var s in columns)
             {
-                if (disablePropertyName.Contains(s.DbName) || disablePropertyName.Contains(s.Name))
+                if (disablePropertyName != null && (disablePropertyName.Contains(s.DbName) || disablePropertyName.Contains(s.Name)))
                     continue;
 
-                if (s.Select)
-                    sb.Append((sb.Length > 0 ? "," : "") + (string.IsNullOrEmpty(s.Raw) ? s.DbName : s.Raw + " AS " + s.DbName));
+                if (!s.Select)
+                    continue;
+
+                if (isFilled)
+                    sb.Append(',');
+
+                isFilled = true;
+                sb.Append(string.IsNullOrEmpty(s.Raw) ? '[' + s.DbName + ']' : s.Raw + " AS [" + s.DbName + ']');
             }
             return sb;
         }
@@ -1633,19 +1783,33 @@ namespace Library
             return OrderByCreate(o, false);
         }
 
-        private string OrderByCreate(OrderBy[] o, bool withoutOrderBy)
+        private string OrderByCreate(OrderBy[] o, bool withoutDeclaration)
         {
             if (o == null)
-                return "";
+                return string.Empty;
 
+            var isFilled = false;
             var sb = new System.Text.StringBuilder();
+
             foreach (var i in o)
             {
                 if (i == null)
                     continue;
-                sb.Append((sb.Length > 0 ? "," : "") + string.Format("{0} {1}", i.Name, (i.Order == OrderByType.Asc ? "ASC" : "DESC")));
+
+                if (isFilled)
+                    sb.Append(',');
+
+                isFilled = true;
+                sb.Append(string.Format("{0} {1}", i.Name, (i.Order == OrderByType.Asc ? "ASC" : "DESC")));
             }
-            return sb.Length > 0 ? (withoutOrderBy ? "" : "ORDER BY ") + sb.ToString() : "";
+
+            if (sb.Length == 0)
+                return string.Empty;
+
+            if (withoutDeclaration)
+                return sb.ToString();
+
+            return "ORDER BY " + sb.ToString();
         }
     }
     #endregion
