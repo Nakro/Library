@@ -398,11 +398,11 @@ namespace Library
     // FOR CONTROLLERS
 
     #region Analylitcs
-    public class Analytics : ActionFilterAttribute, IActionFilter
+    public class AnalyticsAttribute : ActionFilterAttribute, IActionFilter
     {
         public bool AllowXhr { get; set; }
 
-        public Analytics(bool allowXhr = false)
+        public AnalyticsAttribute(bool allowXhr = false)
         {
             AllowXhr = allowXhr;
         }
@@ -412,6 +412,30 @@ namespace Library
             Configuration.Analytics.Request(filterContext.HttpContext, AllowXhr);
             this.OnActionExecuting(filterContext);
         }
+    }
+    #endregion
+
+    #region Stopwatch
+    public class StopwatchAttribute : ActionFilterAttribute, IResultFilter
+    {
+        private DateTime start;
+
+        public StopwatchAttribute() { }
+
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            if (Configuration.AllowStopwatch)
+                start = DateTime.Now;
+            base.OnActionExecuting(filterContext);
+        }
+
+        void IResultFilter.OnResultExecuted(ResultExecutedContext filterContext)
+        {
+            if (Configuration.AllowStopwatch)
+                Configuration.InvokeStopwatch(filterContext.Controller.GetType().Name, DateTime.Now - start, filterContext.RequestContext.HttpContext.Request);
+            base.OnResultExecuted(filterContext);
+        }
+
     }
     #endregion
 

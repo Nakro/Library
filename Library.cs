@@ -43,19 +43,19 @@ namespace Library
         important
     }
 
-    public enum Authorization
+    public enum Authorization : byte
     {
-        logged,
-        unlogged,
-        forbidden
+        logged = 0,
+        unlogged = 1,
+        forbidden = 2
     }
 
     [Flags]
-    public enum ConfigurationDefaults
+    public enum ConfigurationDefaults : byte
     {
-        analytics,
-        cmd,
-        web
+        web = 0,
+        analytics = 1,
+        cmd = 2
     }
 
     [AttributeUsage(AttributeTargets.Property)]
@@ -258,6 +258,7 @@ namespace Library
         public delegate void ErrorEventHandler(string source, Exception ex, Uri uri, string ip);
         public delegate void ChangeEventHandler(string source, string message, Uri uri, string ip);
         public delegate void LogEventHandler(string source, string message, Uri uri, string ip);
+        public delegate void StopwatchEventHandler(string source, TimeSpan time, HttpRequestBase request);
         public delegate Authorization AuthorizationDelegate(HttpContextBase context, string roles, string users);
         public delegate ActionResult AuthorizationErrorDelegate(HttpRequestBase request, Authorization authorization);
         public delegate string VersionDelegate(string name);
@@ -276,6 +277,7 @@ namespace Library
         public static event ErrorEventHandler Error;
         public static event ChangeEventHandler Change;
         public static event LogEventHandler Log;
+        public static event StopwatchEventHandler Stopwatch;
 
         public static readonly CultureInfo InvariantCulture = CultureInfo.InvariantCulture;
         public static ConfigurationUrl Url { get; set; }
@@ -290,6 +292,7 @@ namespace Library
         public static bool AllowProblems { get; set; }
         public static bool AllowChanges { get; set; }
         public static bool AllowErrors { get; set; }
+        public static bool AllowStopwatch { get; set; }
 
         // Delegates
         public static DateConjugationDelegate OnDateConjugation { get; set; }
@@ -332,13 +335,13 @@ namespace Library
 
             Configuration.JsonProvider = new Providers.DefaultJsonSerializerDeserializer();
             Configuration.CacheProvider = new Providers.DefaultCacheProvider();
-            Configuration.AnalyticsProvider = new Providers.DefaultAnalyticsProvider();
             Configuration.Url = new ConfigurationUrl();
 
             Configuration.AllowLogs = true;
             Configuration.AllowProblems = true;
             Configuration.AllowErrors = true;
             Configuration.AllowChanges = true;
+            Configuration.AllowStopwatch = true;
 
             Configuration.Url.CSS = "/css/";
             Configuration.Url.JS = "/js/";
@@ -452,7 +455,10 @@ namespace Library
                 Configuration.OnVersion = n => n;
 
             if ((defaults & ConfigurationDefaults.analytics) == ConfigurationDefaults.analytics)
+            {
+                Configuration.AnalyticsProvider = new Providers.DefaultAnalyticsProvider();
                 Analytics = new Library.Others.Analytics();
+            }
         }
 
         public static void InvokeProblem(string source, string message, Uri uri, string ip = "")
@@ -489,6 +495,15 @@ namespace Library
 
             if (Log != null)
                 Log(source, message, uri, ip);
+        }
+
+        internal static void InvokeStopwatch(string source, TimeSpan time, HttpRequestBase request)
+        {
+            if (!AllowStopwatch)
+                return;
+
+            if (Stopwatch != null)
+                Stopwatch(source, time, request);
         }
     }
     #endregion
@@ -577,9 +592,9 @@ namespace Library
             response.Write("</urlset>");
         }
 
-        public static void Problem(string source, string message, Uri uri)
+        public static void Problem(string source, string message, Uri uri, string ip = "")
         {
-            Configuration.InvokeProblem(source, message, uri);
+            Configuration.InvokeProblem(source, message, uri, ip);
         }
 
         public static void Error(string source, Exception error, Uri uri, string ip = "")
