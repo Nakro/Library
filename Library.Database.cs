@@ -1398,6 +1398,7 @@ namespace Library
                 {
                     if (isFilled)
                         values.Append(',');
+                    isFilled = true;
                     values.Append('[' + s.DbName + "]=@" + s.DbName);
                     continue;
                 }
@@ -1432,6 +1433,7 @@ namespace Library
                 {
                     if (isFilled)
                         values.Append(',');
+                    isFilled = true;
                     values.Append('[' + s.DbName + "]=@" + s.DbName);
                     continue;
                 }
@@ -1601,6 +1603,7 @@ namespace Library
 
                     column.Append(s.DbName);
                     values.Append("@" + s.DbName);
+                    isFilled = true;
                 }
             }
 
