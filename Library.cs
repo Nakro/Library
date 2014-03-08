@@ -1425,10 +1425,11 @@ namespace Library
         {
             using (var mail = new System.Net.Mail.MailMessage())
             {
-                var body = System.Net.Mail.AlternateView.CreateAlternateViewFromString(source.RenderToString(name, model), null, "text/html");
-                mail.SubjectEncoding = System.Text.Encoding.UTF8;
-                mail.HeadersEncoding = System.Text.Encoding.UTF8;
-                mail.BodyEncoding = System.Text.Encoding.UTF8;
+                var utf8 = System.Text.Encoding.UTF8;
+                var body = System.Net.Mail.AlternateView.CreateAlternateViewFromString(source.RenderToString(name, model), utf8, "text/html");
+                mail.SubjectEncoding = utf8;
+                mail.HeadersEncoding = utf8;
+                mail.BodyEncoding = utf8;
                 mail.AlternateViews.Add(body);
                 message(mail);
                 Configuration.OnMail(type, mail);
