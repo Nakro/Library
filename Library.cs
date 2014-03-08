@@ -263,7 +263,7 @@ namespace Library
         public delegate ActionResult AuthorizationErrorDelegate(HttpRequestBase request, Authorization authorization);
         public delegate string VersionDelegate(string name);
         public delegate string DateConjugationDelegate(DateTime current, string language);
-        public delegate string ResourceDelegate(string language, string key);
+        public delegate string ResourceDelegate(string key, string language);
         public delegate string EncryptDelegate(int id, string token);
         public delegate int DecryptDelegate(string hash, string token);
         public delegate Size ImageParserDimensionDelegate(string dimension);
