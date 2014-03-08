@@ -1580,16 +1580,16 @@ namespace Library
             return source.ToString().PadRight(width, padding);
         }
 
-        public static ActionResult JsonSuccess(this Controller source, string param = "")
+        public static ActionResult ToJsonSuccess(this Controller source, string param = "")
         {
             if (string.IsNullOrEmpty(param))
                 return new { r = true }.Json();
             return new { r = true, param = param }.Json();
         }
 
-        public static ActionResult JsonError(this Controller source, string error, string language = "")
+        public static ActionResult ToJsonError(this Controller source, string error, string language = "")
         {
-            return error.JsonError(language);
+            return error.ToJsonError(language);
         }
 
         public static IList<int> ToNumbers(this string source, bool allowZero = false)
@@ -1856,9 +1856,9 @@ namespace Library
             return KeyValue.Create(source, "@");
         }
 
-        public static ActionResult JsonError(this string source, string language = "", Func<string, string, string> onReplace = null)
+        public static ActionResult ToJsonError(this string source, string language = "", Func<string, string, string> onReplace = null)
         {
-            return KeyValue.Create(source, "@").JsonError(language, onReplace);
+            return KeyValue.Create(source, "@").ToJsonError(language, onReplace);
         }
 
         public static Dictionary<string, string> Errors(this ModelStateDictionary source)
@@ -1876,7 +1876,7 @@ namespace Library
             return error;
         }
 
-        public static ActionResult JsonError(this KeyValue source, string language = "", Func<string, string, string> onReplace = null)
+        public static ActionResult ToJsonError(this KeyValue source, string language = "", Func<string, string, string> onReplace = null)
         {
             if (Configuration.OnResource != null && source.Value.IsNotEmpty() && source.Value[0] == '@')
                 source.Value = Configuration.OnResource(source.Value == "@" ? source.Key : source.Value.Substring(1), language);
@@ -1887,7 +1887,7 @@ namespace Library
             return new KeyValue[1] { source }.Json();
         }
 
-        public static ActionResult JsonError(this IEnumerable<KeyValue> source, string language = "", Func<string, string, string> onReplace = null)
+        public static ActionResult ToJsonError(this IEnumerable<KeyValue> source, string language = "", Func<string, string, string> onReplace = null)
         {
             foreach (var m in source)
             {
@@ -1915,7 +1915,7 @@ namespace Library
             return source;
         }
 
-        public static ActionResult JsonError(this ModelStateDictionary source, string language = "", bool allowKeyDuplicate = true, Func<string, string, string> onReplace = null)
+        public static ActionResult ToJsonError(this ModelStateDictionary source, string language = "", bool allowKeyDuplicate = true, Func<string, string, string> onReplace = null)
         {
             var error = new List<KeyValue>(source.Keys.Count);
             foreach (var k in source.Keys)
