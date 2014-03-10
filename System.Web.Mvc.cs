@@ -90,12 +90,12 @@ namespace System.Web.Mvc
 
         public static HtmlString RenderHead(this HtmlHelper source)
         {
-            var value = HttpContext.Current.Items[HEAD] as string;
+            var value = source.ViewData["$HEAD"] as string;
 
             if (value == null)
                 value = "";
 
-            value = "<meta name=\"author\" content=\"{0}\" />".format(Utils.Config("author"));
+            value = "<meta name=\"author\" content=\"{0}\" />".format(Utils.Config("author")) + value;
             return new HtmlString(value);
         }
 

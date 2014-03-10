@@ -304,6 +304,31 @@ namespace Library
     }
     #endregion
 
+    #region UnLogged Attribute
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public class AnonymAttribute : ActionFilterAttribute
+    {
+        private Authorization authorization = Authorization.unlogged;
+        public AnonymAttribute() { }
+
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            if (Configuration.OnAuthorization == null)
+                return;
+
+            this.authorization = Configuration.OnAuthorization(filterContext.HttpContext, string.Empty, string.Empty);
+
+            if (this.authorization != Authorization.unlogged)
+            {
+                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, authorization);
+                return;
+            }
+
+            base.OnActionExecuting(filterContext);
+        }
+    }
+    #endregion
+
     #region Proxy Attribute
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class ProxyAttribute : ActionFilterAttribute
