@@ -29,6 +29,7 @@
 - updated: MarkDown parser
 - updated: JSON serializer / deserializer
 - updated: Library.Database
+- updated: DbParameterAttribute
 
 - renamed: Utils.Log() -> Utils.LogFile()
 

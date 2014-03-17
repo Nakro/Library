@@ -1584,8 +1584,8 @@ namespace Library
         public static ActionResult ToJsonSuccess(this Controller source, string param = "")
         {
             if (string.IsNullOrEmpty(param))
-                return new { r = true }.Json();
-            return new { r = true, param = param }.Json();
+                return new { r = true }.ToJson();
+            return new { r = true, param = param }.ToJson();
         }
 
         public static ActionResult ToJsonError(this Controller source, string error, string language = "")
@@ -1885,7 +1885,7 @@ namespace Library
             if (onReplace != null)
                 source.Value = onReplace(source.Key, source.Value);
 
-            return new KeyValue[1] { source }.Json();
+            return new KeyValue[1] { source }.ToJson();
         }
 
         public static ActionResult ToJsonError(this IEnumerable<KeyValue> source, string language = "", Func<string, string, string> onReplace = null)
@@ -1899,7 +1899,7 @@ namespace Library
                     m.Value = onReplace(m.Key, m.Value);
             }
 
-            return source.Json();
+            return source.ToJson();
         }
 
         public static IList<KeyValue> ToError(this IList<KeyValue> source, string language = "", Func<string, string, string> onResource = null)
@@ -1959,7 +1959,7 @@ namespace Library
                     }
                 }
             }
-            return error.Json();
+            return error.ToJson();
         }
 
         public static bool IsEmail(this string source)
@@ -2348,7 +2348,7 @@ namespace Library
             source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, defaults);
         }
 
-        public static ContentResult Json(this object source, string contentType = "application/json", bool toUnicode = false)
+        public static ContentResult ToJson(this object source, string contentType = "application/json", bool toUnicode = false)
         {
             return source.AsJson(contentType, toUnicode);
         }

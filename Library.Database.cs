@@ -219,6 +219,19 @@ namespace Library
             Size = size;
         }
 
+        public DbParameterAttribute(int size, bool isUnicode)
+        {
+            Size = size;
+            if (isUnicode)
+                type = SqlDbType.NVarChar;
+        }
+
+        public DbParameterAttribute(byte precision, int size)
+        {
+            Precision = precision;
+            Size = size;
+        }
+
         public DbParameterAttribute(SqlDbType type)
         {
             Type = type;
@@ -233,6 +246,12 @@ namespace Library
         public DbParameterAttribute(bool isPrimary)
         {
             PrimaryKey = isPrimary;
+        }
+
+        public DbParameterAttribute(bool isPrimary, bool insert)
+        {
+            PrimaryKey = isPrimary;
+            Insert = insert;
         }
     }
 
