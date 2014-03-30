@@ -369,6 +369,9 @@ namespace Library
         public bool Json { get; set; }
         public int HttpStatus { get; set; }
 
+        public string Parameter { get; set; }
+        public Type ParameterType { get; set; }
+
         public FormAttribute()
         {
             this.HostValid = true;
@@ -376,11 +379,20 @@ namespace Library
             this.Json = true;
         }
 
-        public FormAttribute(bool hostValid = true, int httpStatus = 401, bool Json = true)
+        public FormAttribute(Type type, string parameter = "model", bool hostValid = true, int httpStatus = 401, bool json = true)
+        {
+            this.ParameterType = type;
+            this.Parameter = parameter;
+            this.HostValid = hostValid;
+            this.HttpStatus = httpStatus;
+            this.Json = json;
+        }
+
+        public FormAttribute(bool hostValid = true, int httpStatus = 401, bool json = true)
         {
             this.HostValid = hostValid;
             this.HttpStatus = httpStatus;
-            this.Json = Json;
+            this.Json = json;
         }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
@@ -394,16 +406,6 @@ namespace Library
                 return;
             }
 
-            if (Json)
-            {
-                if (request.ContentType.StartsWith("application/json") == false)
-                {
-                    filterContext.Result = new HttpStatusCodeResult(HttpStatus);
-                    base.OnActionExecuting(filterContext);
-                    return;
-                }
-            }
-
             if (HostValid)
             {
                 var referrer = filterContext.HttpContext.Request.UrlReferrer;
@@ -412,6 +414,26 @@ namespace Library
                     filterContext.Result = new HttpStatusCodeResult(HttpStatus);
                     base.OnActionExecuting(filterContext);
                     return;
+                }
+            }
+
+            if (Json)
+            {
+                if (request.ContentType.StartsWith("application/json") == false)
+                {
+                    filterContext.Result = new HttpStatusCodeResult(HttpStatus);
+                    base.OnActionExecuting(filterContext);
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(Parameter))
+                {
+                    string inputContent = "";
+                    using (var sr = new StreamReader(filterContext.HttpContext.Request.InputStream))
+                        inputContent = sr.ReadToEnd();
+
+                    var value = Configuration.JsonProvider.DeserializeObject(inputContent, ParameterType);
+                    filterContext.ActionParameters[Parameter] = value;
                 }
             }
 

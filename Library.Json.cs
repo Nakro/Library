@@ -125,7 +125,7 @@ namespace Library.Json
                         countArr++;
                         continue;
                     }
-                    
+
                     if (c == ']' && countArr > 0)
                     {
                         countArr--;
@@ -225,7 +225,7 @@ namespace Library.Json
         {
             try
             {
-                return _serializer.Deserialize(json.Trim());
+                return _serializer.DeserializeType(json, type);
             }
             catch (Exception Ex)
             {
@@ -1105,33 +1105,57 @@ namespace Library.Json
             foreach (var j in values)
             {
                 if (j.IsString)
+                {
                     dic.Add(j.Name, FromSafeString(j.Value));
-                else if (j.Value == "false" || j.Value == "true")
+                    continue;
+                }
+
+                if (j.Value == "false" || j.Value == "true")
+                {
                     dic.Add(j.Name, j.Value == "true");
-                else if (j.Value == "null" || j.Value == "{}")
+                    continue;
+                }
+
+                if (j.Value == "null" || j.Value == "{}")
+                {
                     dic.Add(j.Name, null);
-                else if (j.Value == "[]")
+                    continue;
+                }
+
+                if (j.Value == "[]")
+                {
                     dic.Add(j.Name, new string[0]);
-                else if (j.Value.StartsWith("[{"))
+                    continue;
+                }
+
+                if (j.Value.StartsWith("[{"))
                 {
                     var arr = ParserArray(j.Value);
                     var arrDynamic = new List<dynamic>(arr.Count);
                     foreach (var a in arr)
                         arrDynamic.Add(Deserialize(a));
                     dic.Add(j.Name, arrDynamic);
+                    continue;
                 }
-                else if (j.Value[0] == '[')
-                    dic.Add(j.Name, ParserArrayValue(j.Value));
-                else if (j.Value[0] == '{')
-                    dic.Add(j.Name, Deserialize(j.Value));
-                else
+
+                if (j.Value[0] == '[')
                 {
-                    if (j.Value.IndexOf('.') > 0)
-                        dic.Add(j.Name, j.Value.To<float>());
-                    else
-                        dic.Add(j.Name, j.Value.To<int>());
+                    dic.Add(j.Name, ParserArrayValue(j.Value));
+                    continue;
                 }
+
+                if (j.Value[0] == '{')
+                {
+                    dic.Add(j.Name, Deserialize(j.Value));
+                    continue;
+                }
+
+                if (j.Value.IndexOf('.') > 0)
+                    dic.Add(j.Name, j.Value.To<float>());
+                else
+                    dic.Add(j.Name, j.Value.To<int>());
             }
+
             return obj;
         }
 
@@ -1182,14 +1206,22 @@ namespace Library.Json
                     {
                         var n = a.Name.ToLower();
                         object obj = a.GetValue(p, null);
+
                         if (obj == null)
                             continue;
-                        if (n == "name")
-                            name = obj.ToString();
-                        else if (n == "read")
-                            read = (bool)obj;
-                        else if (n == "write")
-                            write = (bool)obj;
+
+                        switch (n)
+                        {
+                            case "name":
+                                name = obj.ToString();
+                                break;
+                            case "read":
+                                read = (bool)obj;
+                                break;
+                            case "write":
+                                write = (bool)obj;
+                                break;
+                        }
                     }
                 }
             }

@@ -459,6 +459,9 @@ namespace Library
                 Configuration.AnalyticsProvider = new Providers.DefaultAnalyticsProvider();
                 Analytics = new Library.Others.Analytics();
             }
+
+            ValueProviderFactories.Factories.Remove(ValueProviderFactories.Factories.OfType<JsonValueProviderFactory>().Single());
+            //ValueProviderFactories.Factories.Add(new JsonDeserializeProviderFactory());
         }
 
         public static void InvokeProblem(string source, string message, Uri uri, string ip = "")
@@ -1419,6 +1422,13 @@ namespace Library
         public static Others.Analytics Analytics(this Controller source)
         {
             return Configuration.Analytics;
+        }
+
+        public static T Deserialize<T>(this Controller source)
+        {
+            source.Request.InputStream.Seek(0, System.IO.SeekOrigin.Begin);
+            var data = new System.IO.StreamReader(source.Request.InputStream).ReadToEnd();
+            return Configuration.JsonProvider.DeserializeObject<T>(data);
         }
 
         public static void Mail(this Controller source, string type, string name, object model, Action<System.Net.Mail.MailMessage> message)

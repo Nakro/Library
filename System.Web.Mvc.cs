@@ -534,6 +534,8 @@ namespace System.Web.Mvc
             if (cls.IsNotEmpty())
                 sb.AppendAttribute("class", cls);
 
+            sb.Append(" />");
+
             return new HtmlString(sb.ToString());
         }
 
