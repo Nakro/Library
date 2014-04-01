@@ -831,9 +831,12 @@ namespace Library.Json
             foreach (var j in SearchValue.Search(new StringBuilder(value)))
             {
                 if (i++ % 2 == 0)
+                {
                     n = j.Value;
-                else
-                    v.Add(new JsonValue() { Name = n, Value = j.Value, IsArrayClass = j.IsArrayClass, IsString = j.IsString });
+                    continue;
+                }
+
+                v.Add(new JsonValue() { Name = n, Value = j.Value, IsArrayClass = j.IsArrayClass, IsString = j.IsString });
             }
             return v;
         }
@@ -841,6 +844,10 @@ namespace Library.Json
         List<string> ParserArray(string value)
         {
             var l = new List<string>(10);
+
+            if (value == "[]")
+                return l;
+
             var JeVnorene = false;
             var indexBeg = 0;
             var counter = 0;
@@ -852,10 +859,16 @@ namespace Library.Json
                     JeVnorene = true;
                     indexBeg = i;
                     counter = 0;
+                    continue;
                 }
-                else if (c == '{' && JeVnorene)
+
+                if (c == '{' && JeVnorene)
+                {
                     counter++;
-                else if (c == '}')
+                    continue;
+                }
+
+                if (c == '}')
                 {
                     counter--;
                     if (counter == -1)
@@ -863,6 +876,7 @@ namespace Library.Json
                         JeVnorene = false;
                         l.Add(value.Substring(indexBeg, ((i + 1) - indexBeg)));
                     }
+                    continue;
                 }
             }
             return l;
@@ -871,6 +885,10 @@ namespace Library.Json
         List<string> ParserArrayValue(string value)
         {
             var l = new List<string>(10);
+
+            if (value == "[]")
+                return l;
+
             var index = 0;
             var beg = 1;
             var end = 0;
@@ -902,19 +920,17 @@ namespace Library.Json
 
                 if (c == '\"')
                 {
-                    if (countStr > 0)
-                    {
-                        end = index - 1;
-                        l.Add(value.Substring(beg, end - beg));
-                        beg = end;
-                        countStr = 0;
-                    }
-                    else
+                    if (countStr == 0)
                     {
                         countStr++;
                         beg = index;
                         continue;
                     }
+
+                    end = index - 1;
+                    l.Add(value.Substring(beg, end - beg));
+                    beg = end;
+                    countStr = 0;
                 }
             }
 
@@ -964,13 +980,11 @@ namespace Library.Json
                 Guid g;
                 if (Guid.TryParse(v, out g))
                     return g;
+
+                if (t == ConfigurationCache.type_guid_null)
+                    return null;
                 else
-                {
-                    if (t == ConfigurationCache.type_guid_null)
-                        return null;
-                    else
-                        return Guid.Empty;
-                }
+                    return Guid.Empty;
             }
 
             return null;
@@ -983,6 +997,8 @@ namespace Library.Json
 
         object ParseArray(Type t, string jsonValue)
         {
+
+
             if (jsonValue.StartsWith("[{") && !t.IsGenericType)
             {
                 // objekt array
@@ -999,7 +1015,7 @@ namespace Library.Json
             {
 
                 // classic array
-                var values = ParserArrayValue(jsonValue); //.Remove(0, 1).Remove(JsonValue.Length - 2, 1).Split(',');
+                var values = ParserArrayValue(jsonValue);
                 var obj = Array.CreateInstance(t.GetElementType(), values.Count);
 
                 for (var i = 0; i < values.Count; i++)
@@ -1060,11 +1076,10 @@ namespace Library.Json
                 }
 
                 var name = attr.Item1;
-
                 if (!attr.Item4 || !attr.Item2)
                     continue;
 
-                if (!(p.PropertyType.IsArray && p.PropertyType.IsClass) || p.PropertyType == ConfigurationCache.type_string)
+                if (!(p.PropertyType.IsArray || p.PropertyType.IsClass) || p.PropertyType == ConfigurationCache.type_string)
                 {
                     item = Find(name, values);
                     if (item != null)
@@ -1076,7 +1091,7 @@ namespace Library.Json
                 {
                     item = Find(name, values);
                     if (item != null && item.IsArrayClass)
-                        p.SetValue(o, item.Value == "[]" ? null : ParseArray(p.PropertyType, item.Value), null);
+                        p.SetValue(o, item.Value == "null" ? null : ParseArray(p.PropertyType, item.Value), null);
                 }
                 else
                 {
@@ -1198,33 +1213,34 @@ namespace Library.Json
                 }
             }
 
-            if (use)
+            if (!use)
+                return new Tuple<string, bool, bool, bool>(name, read, write, use);
+
+            foreach (var p in t.GetCustomAttributes(typeof(JsonParameterAttribute), false))
             {
-                foreach (var p in t.GetCustomAttributes(typeof(JsonParameterAttribute), false))
+                foreach (var a in p.GetType().GetProperties())
                 {
-                    foreach (var a in p.GetType().GetProperties())
+                    var n = a.Name.ToLower();
+                    object obj = a.GetValue(p, null);
+
+                    if (obj == null)
+                        continue;
+
+                    switch (n)
                     {
-                        var n = a.Name.ToLower();
-                        object obj = a.GetValue(p, null);
-
-                        if (obj == null)
-                            continue;
-
-                        switch (n)
-                        {
-                            case "name":
-                                name = obj.ToString();
-                                break;
-                            case "read":
-                                read = (bool)obj;
-                                break;
-                            case "write":
-                                write = (bool)obj;
-                                break;
-                        }
+                        case "name":
+                            name = obj.ToString();
+                            break;
+                        case "read":
+                            read = (bool)obj;
+                            break;
+                        case "write":
+                            write = (bool)obj;
+                            break;
                     }
                 }
             }
+
             return new Tuple<string, bool, bool, bool>(name, read, write, use);
         }
 
@@ -1262,15 +1278,19 @@ namespace Library.Json
                         continue;
                 }
 
-                if (Configuration.JsonUnicode)
+                if (!Configuration.JsonUnicode)
                 {
-                    if (code > 192 || code == 64)
-                        sb.Append("\\u" + code.ToString("X").PadLeft(4, '0'));
-                    else
-                        sb.Append(c);
-                }
-                else
                     sb.Append(c);
+                    continue;
+                }
+
+                if (code > 192 || code == 64)
+                {
+                    sb.Append("\\u" + code.ToString("X").PadLeft(4, '0'));
+                    continue;
+                }
+
+                sb.Append(c);
             }
 
             return sb.ToString();

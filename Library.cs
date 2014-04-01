@@ -1640,6 +1640,11 @@ namespace Library
             return source.Request.IsAjaxRequest();
         }
 
+        public static IList<KeyValue> Validate(this Controller source, object model, bool allProperties = true)
+        {
+            return Utils.Validate(model, allProperties);
+        }
+
         public static string Remove(this string source, string text)
         {
             return source.Replace(text, "");
