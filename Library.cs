@@ -2463,6 +2463,8 @@ namespace Library
 
         public static string Hash(this System.IO.Stream source, string type = "md5")
         {
+            source.Seek(0, System.IO.SeekOrigin.Begin);
+
             if (type.Equals("sha1", StringComparison.InvariantCultureIgnoreCase))
             {
                 using (var crypto = new System.Security.Cryptography.SHA1CryptoServiceProvider())

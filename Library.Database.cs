@@ -1874,7 +1874,7 @@ namespace Library
             var type = typeof(T);
             var prop = type.GetProperty(name);
             var value = prop.GetValue(this, null);
-            var propType = prop.GetType();
+            var propType = prop.PropertyType;
             var insert = false;
 
             if (propType == ConfigurationCache.type_string)
@@ -1899,7 +1899,12 @@ namespace Library
             if (insert)
                 return Insert(db, disablePropertyName);
 
-            return Update(db, disablePropertyName);
+            var r = Update(db, disablePropertyName);
+
+            if (!r)
+                r = Insert(db, disablePropertyName);
+
+            return r;
         }
 
         public virtual bool Delete(IDatabase db)
@@ -1910,6 +1915,11 @@ namespace Library
         public static T Load(IDatabase db, object primaryKey)
         {
             return new Sql<T>(db).FindByPK(primaryKey);
+        }
+
+        public static T Load(IDatabase db, SqlBuilder builder)
+        {
+            return new Sql<T>(db).FindOne(builder);
         }
 
         public virtual bool Refresh(IDatabase db)
