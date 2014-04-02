@@ -1412,7 +1412,7 @@ namespace Library
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 04. 05. 2008
-    // Updated      : 23. 02. 2014
+    // Updated      : 02. 04. 2014
     // Description  : Extension methods
     // ===============================================================================================
 
@@ -2459,6 +2459,30 @@ namespace Library
             }
 
             return EncryptDecrypt.Hash(source + salt);
+        }
+
+        public static string Hash(this System.IO.Stream source, string type = "md5")
+        {
+            if (type.Equals("sha1", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA1CryptoServiceProvider())
+                    return BitConverter.ToString(crypto.ComputeHash(source)).Replace("-", string.Empty);
+            }
+
+            if (type.Equals("sha256", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA256CryptoServiceProvider())
+                    return BitConverter.ToString(crypto.ComputeHash(source)).Replace("-", string.Empty);
+            }
+
+            if (type.Equals("sha512", StringComparison.InvariantCultureIgnoreCase))
+            {
+                using (var crypto = new System.Security.Cryptography.SHA512CryptoServiceProvider())
+                    return BitConverter.ToString(crypto.ComputeHash(source)).Replace("-", string.Empty);
+            }
+
+            using (var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider())
+                return BitConverter.ToString(crypto.ComputeHash(source)).Replace("-", string.Empty);
         }
 
         public static int IdDecrypt(string hash, string token = "")
