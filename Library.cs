@@ -2061,6 +2061,25 @@ namespace Library
             return s.To<int>().Format();
         }
 
+        public static string Format(this double source)
+        {
+            string s = source.ToString().Replace(',', '.');
+
+            var index = s.IndexOf('.');
+            if (index > 0)
+            {
+                var cislo = s.Substring(0, index);
+                if (cislo.Length < 3)
+                    return s;
+                return cislo.To<int>().Format() + s.Substring(index).Replace(',', '.');
+            }
+
+            if (s.Length < 4)
+                return s;
+
+            return s.To<int>().Format();
+        }
+
         public static string Format(this decimal source, int round)
         {
             var output = Math.Round(source, round).Format();
@@ -2084,6 +2103,36 @@ namespace Library
                 return output.PadRight(output.Length + (round - len), '0');
 
             return output;
+        }
+
+        public static string Format(this double source, int round)
+        {
+            var output = Math.Round(source, round).Format();
+            var dot = output.IndexOf('.');
+
+            if (dot == -1)
+            {
+
+                if (round == 0)
+                    return output;
+
+                output += '.';
+                dot = output.Length;
+            }
+            else
+                round++;
+
+            var len = output.Substring(dot).Length;
+
+            if (len < round)
+                return output.PadRight(output.Length + (round - len), '0');
+
+            return output;
+        }
+
+        public static string Format(this float source, int round)
+        {
+            return ((double)source).Format(round);
         }
 
         public static decimal FindNumber(this string source)

@@ -331,9 +331,14 @@ namespace Library
             return this;
         }
 
-        public SqlBuilder Append(string column, string sqlOperator, object value)
+        public SqlBuilder Append(string column, string sqlOperator, object value, string schema = "")
         {
-            return AppendSql(string.Format("[{0}] {1} {2}", column, sqlOperator, value));
+            var safe = value == null ? string.Empty : value.ToString();
+
+            if (value.GetType() == ConfigurationCache.type_string)
+                safe = safe.Replace("'", "''");
+
+            return AppendSql(string.Format("{0}[{1}] {2} {3}", schema != "" ? "[" + schema + "]." : "", column, sqlOperator, safe));
         }
 
         public SqlBuilder AppendSql(string sql, params object[] values)
@@ -349,6 +354,16 @@ namespace Library
         {
             var pn = "_" + column + (param == null ? "0" : (param.Value.Count + 1).ToString());
             return AppendSqlParameter(string.Format("[{0}] {1} @{2}", column, sqlOperator, pn), pn, value);
+        }
+
+        public SqlBuilder And()
+        {
+            return AppendOperator("AND");
+        }
+
+        public SqlBuilder Or()
+        {
+            return AppendOperator("OR");
         }
 
         public SqlBuilder AppendSqlParameter(string sql, string parameterName, object value)
@@ -368,10 +383,10 @@ namespace Library
             return this;
         }
 
-        public SqlBuilder AppendLike(string name, string value, string format = "%{0}%")
+        public SqlBuilder AppendLike(string name, string value, string schema = "", string format = "%{0}%")
         {
             var paramName = "param" + param.Value.Count;
-            return AppendSqlParameter(string.Format("[{0}] LIKE @{1}", name, paramName), paramName, string.Format(format, value.Replace(' ', '%')));
+            return AppendSqlParameter(string.Format("{0}[{1}] LIKE @{2}", schema != "" ? "[" + schema + "]." : "", name, paramName), paramName, string.Format(format, value.Replace(' ', '%')));
         }
 
         public override string ToString()
