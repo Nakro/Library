@@ -24,21 +24,20 @@ namespace Library.Json
             {
                 var i = 0;
                 var l = new List<SearchValue>(10);
-                var s = new StringBuilder();
 
                 while (i < sb.Length)
                 {
                     var c = sb[i];
                     if (c == '"')
                     {
-                        var v = new SearchValue() { Index = i, Value = getWord(i, sb), IsString = true, IsArrayClass = false };
+                        var v = new SearchValue { Index = i, Value = getWord(i, sb), IsString = true, IsArrayClass = false };
                         l.Add(v);
                         i = v.Index + v.Value.Length + 1;
                     }
                     else if (c == ':' && sb[i + 1] != '"')
                     {
                         var val = getValue(i, sb);
-                        var v = new SearchValue() { Index = i, Value = val, IsArrayClass = val[0] == '[' || val[0] == '{' };
+                        var v = new SearchValue { Index = i, Value = val, IsArrayClass = val[0] == '[' || val[0] == '{' };
                         l.Add(v);
                         i = v.Index + v.Value.Length + 1;
                     }
@@ -622,14 +621,14 @@ namespace Library.Json
             if (!cacheList.TryGetValue(t, out cache))
             {
                 cache = new JsonCache();
-                cache.Properties = t.GetProperties(System.Reflection.BindingFlags.FlattenHierarchy | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                cache.Properties = t.GetProperties(BindingFlags.FlattenHierarchy | BindingFlags.Instance | BindingFlags.Public);
                 cache.Attributes = new Dictionary<PropertyInfo, Tuple<string, bool, bool, bool>>(2);
                 cacheList.TryAdd(t, cache);
             }
 
             foreach (var p in cache.Properties)
             {
-                Tuple<string, bool, bool, bool> attr = null;
+                Tuple<string, bool, bool, bool> attr;
 
                 if (!cache.Attributes.TryGetValue(p, out attr))
                 {
@@ -663,24 +662,24 @@ namespace Library.Json
             sb.Append('}');
         }
 
-        void WriteArray(StringBuilder sb, bool divider, string Name, object Value)
+        void WriteArray(StringBuilder sb, bool divider, string name, object value)
         {
 
-            if (Value == null)
+            if (value == null)
             {
-                WriteNull(sb, divider, Name);
+                WriteNull(sb, divider, name);
                 return;
             }
 
             if (sb.Length > 0 && divider)
                 sb.Append(',');
 
-            var arr = Value as Array;
+            var arr = value as Array;
             if (arr == null)
                 return;
 
-            if (!string.IsNullOrEmpty(Name))
-                sb.Append(string.Format("\"{0}\":[", Name));
+            if (!string.IsNullOrEmpty(name))
+                sb.Append(string.Format("\"{0}\":[", name));
 
             var div = false;
 
@@ -703,7 +702,7 @@ namespace Library.Json
                 div = true;
             }
 
-            if (!string.IsNullOrEmpty(Name))
+            if (!string.IsNullOrEmpty(name))
                 sb.Append(']');
         }
 
@@ -713,7 +712,7 @@ namespace Library.Json
             var sb = new StringBuilder();
 
             var isList = t.GetInterface("IList") != null;
-            var isEnum = (!isList ? t.GetInterface("IEnumerable") != null : false);
+            var isEnum = !isList && t.GetInterface("IEnumerable") != null;
 
             if (t.IsArray || isList || isEnum)
             {
@@ -836,7 +835,7 @@ namespace Library.Json
                     continue;
                 }
 
-                v.Add(new JsonValue() { Name = n, Value = j.Value, IsArrayClass = j.IsArrayClass, IsString = j.IsString });
+                v.Add(new JsonValue { Name = n, Value = j.Value, IsArrayClass = j.IsArrayClass, IsString = j.IsString });
             }
             return v;
         }
@@ -949,7 +948,7 @@ namespace Library.Json
                 return Utils.To<bool>(v);
 
             if (t == ConfigurationCache.type_string)
-                return isArray ? FromSafeString(v.ToString()) : FromSafeString(Utils.To<string>(v.ToString().Substring(0, v.ToString().Length)));
+                return isArray ? FromSafeString(v) : FromSafeString(Utils.To<string>(v.Substring(0, v.Length)));
 
             if (t == ConfigurationCache.type_datetime || t == ConfigurationCache.type_datetime_null)
                 return ConvertStringToDateTime(v);
@@ -975,22 +974,20 @@ namespace Library.Json
             if (t == ConfigurationCache.type_float || t == ConfigurationCache.type_float_null)
                 return Utils.To<float>(v);
 
-            if (t == ConfigurationCache.type_guid || t == ConfigurationCache.type_guid_null)
-            {
+            if (t == ConfigurationCache.type_guid || t == ConfigurationCache.type_guid_null) {
                 Guid g;
                 if (Guid.TryParse(v, out g))
                     return g;
 
                 if (t == ConfigurationCache.type_guid_null)
                     return null;
-                else
-                    return Guid.Empty;
+                return Guid.Empty;
             }
 
             return null;
         }
 
-        JsonValue Find(string name, List<JsonValue> values)
+        JsonValue Find(string name, IEnumerable<JsonValue> values)
         {
             return values.FirstOrDefault(n => n.Name == name);
         }
@@ -999,7 +996,7 @@ namespace Library.Json
         {
 
 
-            if (jsonValue.StartsWith("[{") && !t.IsGenericType)
+            if (jsonValue.StartsWith("[{", StringComparison.InvariantCulture) && !t.IsGenericType)
             {
                 // objekt array
                 var values = ParserArray(jsonValue);
@@ -1025,7 +1022,7 @@ namespace Library.Json
 
             }
 
-            if (jsonValue.StartsWith("[{") && t.IsGenericType)
+            if (jsonValue.StartsWith("[{", StringComparison.InvariantCulture) && t.IsGenericType)
             {
                 var obj = Activator.CreateInstance(t) as IList;
                 var values = ParserArray(jsonValue);
@@ -1051,7 +1048,7 @@ namespace Library.Json
 
         object ParseObject(Type t, string JV)
         {
-            var o = System.Activator.CreateInstance(t);
+            var o = Activator.CreateInstance(t);
             var values = Parser(JV);
 
             JsonValue item = null;
@@ -1060,14 +1057,14 @@ namespace Library.Json
             if (!cacheList.TryGetValue(t, out cache))
             {
                 cache = new JsonCache();
-                cache.Properties = t.GetProperties(System.Reflection.BindingFlags.FlattenHierarchy | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                cache.Properties = t.GetProperties(BindingFlags.FlattenHierarchy | BindingFlags.Instance | BindingFlags.Public);
                 cache.Attributes = new Dictionary<PropertyInfo, Tuple<string, bool, bool, bool>>(2);
                 cacheList.TryAdd(t, cache);
             }
 
             foreach (var p in cache.Properties)
             {
-                Tuple<string, bool, bool, bool> attr = null;
+                Tuple<string, bool, bool, bool> attr;
 
                 if (!cache.Attributes.TryGetValue(p, out attr))
                 {
@@ -1109,7 +1106,7 @@ namespace Library.Json
 
         public dynamic Deserialize(string value)
         {
-            if (value != null && !value.StartsWith("[{") && value.StartsWith("["))
+            if (value != null && !value.StartsWith("[{", StringComparison.InvariantCulture) && value.StartsWith("[", StringComparison.InvariantCulture))
                 return ParserArrayValue(value);
 
             var values = Parser(value);
@@ -1143,7 +1140,7 @@ namespace Library.Json
                     continue;
                 }
 
-                if (j.Value.StartsWith("[{"))
+                if (j.Value.StartsWith("[{", StringComparison.InvariantCulture))
                 {
                     var arr = ParserArray(j.Value);
                     var arrDynamic = new List<dynamic>(arr.Count);
@@ -1252,7 +1249,7 @@ namespace Library.Json
 
         private string ToSafeString(string s)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             foreach (var c in s)
             {
                 var code = Convert.ToInt32(c);
@@ -1298,7 +1295,7 @@ namespace Library.Json
 
         private string FromSafeString(string s)
         {
-            if (s.IndexOf("\\u") > -1)
+            if (s.IndexOf("\\u", StringComparison.Ordinal) > -1)
                 s = Utils.UnicodeDecode(s);
             return s.Replace("\\/", "/").Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t").Replace("\\\"", "\"");
         }

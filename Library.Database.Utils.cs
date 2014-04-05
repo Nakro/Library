@@ -31,7 +31,7 @@ namespace Library.DatabaseUtils
         public bool IsSizeDeclared { get; set; }
         public bool Json { get; set; }
 
-        public Parameter(string name, System.Type propertyType, object value, int size, SqlDbType? type, byte precision = 10, bool json = false, byte scale = 2)
+        public Parameter(string name, Type propertyType, object value, int size, SqlDbType? type, byte precision = 10, bool json = false, byte scale = 2)
         {
             this.Name = name;
             this.Value = value;
@@ -68,7 +68,7 @@ namespace Library.DatabaseUtils
 
             foreach (var i in p)
             {
-                object value = null;
+                object value;
 
                 if (!dictionary.TryGetValue(i.Name, out value))
                     continue;
@@ -196,15 +196,11 @@ namespace Library.DatabaseUtils
                 var b = (o as SqlBuilder);
                 if (b.HasParameter)
                     return b.Parameters.ToArray();
-                else
-                    return null;
+                return null;
             }
 
             if (o.GetType() == typeof(List<Parameter>))
-            {
-                var b = (o as List<Parameter>);
-                return b.ToArray();
-            }
+                return o as List<Parameter>;
 
             var p = o.GetType().GetProperties();
             var l = new List<Parameter>(p.Length);
@@ -370,7 +366,7 @@ namespace Library.DatabaseUtils
         internal static string Append(string dbName, string raw, string name)
         {
             if (!string.IsNullOrEmpty(raw))
-                return string.Format("{0} AS [{0}]", raw, name);
+                return string.Format("{0} AS [{1}]", raw, name);
 
             if (dbName == name)
                 return string.Format("[{0}]", name);
@@ -479,7 +475,7 @@ namespace Library.DatabaseUtils
                 if (primary && !isUpdate)
                     update = false;
 
-                l.Add(new Column() { Name = i.Name, DbName = name, Update = update, Insert = insert, PrimaryKey = primary, Raw = raw, Select = select, Type = dbType, Json = json });
+                l.Add(new Column { Name = i.Name, DbName = name, Update = update, Insert = insert, PrimaryKey = primary, Raw = raw, Select = select, Type = dbType, Json = json });
             }
 
             return l;

@@ -74,7 +74,7 @@ namespace Library.Others
         private int Last { get; set; }
         private int Interval { get; set; }
 
-        private int[] Generation = new int[2] { 0, 0 };
+        private int[] Generation = { 0, 0 };
 
         private Regex reg_robot = new Regex("bot|crawler", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
         private Regex reg_mobile = new Regex("Android|webOS|iPhone|iPad|iPod|BlackBerry|Windows.?Phone", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -89,12 +89,12 @@ namespace Library.Others
 
         public Analytics()
         {
-            ListSocial.AddRange(new string[] { "plus.url.google", "plus.google", "twitter", "facebook", "linkedin", "tumblr", "flickr", "instagram" });
-            ListSearch.AddRange(new string[] { "google", "bing", "yahoo" });
+            ListSocial.AddRange(new [] { "plus.url.google", "plus.google", "twitter", "facebook", "linkedin", "tumblr", "flickr", "instagram" });
+            ListSearch.AddRange(new [] { "google", "bing", "yahoo" });
             Ip = new List<OnlineIp>(10);
             Timer = new System.Timers.Timer(30000);
             Timer.Enabled = true;
-            Timer.Elapsed += new System.Timers.ElapsedEventHandler(Service);
+            Timer.Elapsed += Service;
             Stats = new Statistics();
             Load();
         }
@@ -154,7 +154,7 @@ namespace Library.Others
 
             if (user > 0)
             {
-                sum = Math.Abs(this.Ticks - user) / TimeSpan.TicksPerSecond;
+                sum = Math.Abs(Ticks - user) / TimeSpan.TicksPerSecond;
                 if (sum < 41)
                     return;
 

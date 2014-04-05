@@ -81,7 +81,7 @@ namespace Library
         bool Exists();
         bool Exists(SqlBuilder builder);
 
-        object Insert(object Arg, params string[] disabledPropertyName);
+        object Insert(object arg, params string[] disabledPropertyName);
 
         int Update(string where, object arg, params string[] disabledPropertyName);
         int Update(string where, object arg, object whereArg, params string[] disabledPropertyName);
@@ -294,7 +294,7 @@ namespace Library
     #region SqlBuilder
     public class SqlBuilder
     {
-        private System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        private StringBuilder sb = new StringBuilder();
         private Lazy<List<Parameter>> param = new Lazy<List<Parameter>>();
 
         public List<Parameter> Parameters
@@ -402,15 +402,15 @@ namespace Library
             if (builder.Parameters != null)
             {
                 foreach (var i in builder.Parameters)
-                    this.param.Value.Add(i);
+                    param.Value.Add(i);
             }
 
-            return this.AppendSql(builder.ToString());
+            return AppendSql(builder.ToString());
         }
 
-        public SqlBuilder AppendBuilder(System.Text.StringBuilder builder)
+        public SqlBuilder AppendBuilder(StringBuilder builder)
         {
-            return this.AppendSql(builder.ToString());
+            return AppendSql(builder.ToString());
         }
 
         public SqlBuilder ParameterAdd(string name, object value)
@@ -426,8 +426,8 @@ namespace Library
 
         public string ToString(bool appendWhere)
         {
-            if (this.HasValue)
-                return (appendWhere ? " WHERE " : "") + this.ToString();
+            if (HasValue)
+                return (appendWhere ? " WHERE " : "") + this;
             return "";
         }
     }
@@ -439,22 +439,24 @@ namespace Library
         public string Name { get; set; }
         public OrderByType Order { get; set; }
 
-        public static OrderBy Asc(string ColumnName)
+        public static OrderBy Asc(string columnName)
         {
-            return new OrderBy() { Name = ColumnName, Order = OrderByType.Asc };
+            return new OrderBy { Name = columnName, Order = OrderByType.Asc };
         }
 
-        public static OrderBy Desc(string ColumnName)
+        public static OrderBy Desc(string columnName)
         {
-            return new OrderBy() { Name = ColumnName, Order = OrderByType.Desc };
+            return new OrderBy {
+                Name = columnName,
+                Order = OrderByType.Desc
+            };
         }
 
-        public static OrderBy Create(string ColumnName, bool Asc)
+        public static OrderBy Create(string columnName, bool asc)
         {
-            if (Asc)
-                return OrderBy.Asc(ColumnName);
-            else
-                return OrderBy.Desc(ColumnName);
+            if (asc)
+                return OrderBy.Asc(columnName);
+            return OrderBy.Desc(columnName);
         }
 
         public override string ToString()
@@ -488,6 +490,7 @@ namespace Library
 
     public class Database : IConnection<Database>, IDatabase, IDisposable
     {
+        private const int BUFFER_SIZE = 1024;
         public bool IsOpened { get; private set; }
 
         public int Version
@@ -510,7 +513,7 @@ namespace Library
 
         public static Column[] GetTableColumnCache(Type t)
         {
-            Column[] columns = null;
+            Column[] columns;
 
             if (TableColumnCache.TryGetValue(t.FullName, out columns))
                 return columns;
@@ -537,7 +540,7 @@ namespace Library
             Open(connectionString, null);
         }
 
-        public Database(string connectionString, System.Data.IsolationLevel? isoLevel)
+        public Database(string connectionString, IsolationLevel? isoLevel)
         {
             Open(connectionString, isoLevel);
         }
@@ -552,7 +555,7 @@ namespace Library
             throw new Exception(_sql, ex);
         }
 
-        public void Open(string connString, System.Data.IsolationLevel? isoLevel)
+        public void Open(string connString, IsolationLevel? isoLevel)
         {
             try
             {
@@ -593,7 +596,7 @@ namespace Library
             Open(connString, null);
         }
 
-        public void TransactionBegin(System.Data.IsolationLevel isoLevel)
+        public void TransactionBegin(IsolationLevel isoLevel)
         {
             if (transaction != null)
             {
@@ -658,7 +661,7 @@ namespace Library
                 if (sql != _sql)
                 {
                     cmd.CommandText = sql;
-                    ParamToParam(cmd, parameters, false);
+                    ParamToParam(cmd, parameters);
                     _sql = sql;
 
                     if (_prepare)
@@ -686,7 +689,7 @@ namespace Library
                 if (sql != _sql)
                 {
                     cmd.CommandText = sql;
-                    ParamToParam(cmd, parameters, false);
+                    ParamToParam(cmd, parameters);
                     _sql = sql;
 
                     if (_prepare)
@@ -711,7 +714,7 @@ namespace Library
             if (sql != _sql)
             {
                 cmd.CommandText = sql;
-                ParamToParam(cmd, parameters, false);
+                ParamToParam(cmd, parameters);
                 _sql = sql;
 
                 if (_prepare)
@@ -737,9 +740,10 @@ namespace Library
                             {
                                 var t = reader.GetFieldType(i);
                                 dic.Add(reader.GetName(i), t.IsValueType && t != date ? Activator.CreateInstance(t) : null);
+                                continue;
                             }
-                            else
-                                dic.Add(reader.GetName(i), value);
+
+                            dic.Add(reader.GetName(i), value);
                         }
                         yield return obj;
                     }
@@ -753,7 +757,7 @@ namespace Library
             if (sql != _sql)
             {
                 cmd.CommandText = sql;
-                ParamToParam(cmd, parameters, false);
+                ParamToParam(cmd, parameters);
                 _sql = sql;
 
                 if (_prepare)
@@ -792,9 +796,10 @@ namespace Library
                                 {
                                     var t = reader.GetFieldType(i);
                                     dic.Add(reader.GetName(i), t.IsValueType && t != date ? Activator.CreateInstance(t) : null);
+                                    continue;
                                 }
-                                else
-                                    dic.Add(reader.GetName(i), value);
+
+                                dic.Add(reader.GetName(i), value);
                             }
 
                             var result = onRead(index, obj);
@@ -820,7 +825,7 @@ namespace Library
             if (sql != _sql)
             {
                 cmd.CommandText = sql;
-                ParamToParam(cmd, parameters, false);
+                ParamToParam(cmd, parameters);
                 _sql = sql;
 
                 if (_prepare)
@@ -840,17 +845,16 @@ namespace Library
 
                 while (reader.Read())
                 {
-                    var bufferSize = 1024;
-                    var buffer = new byte[bufferSize];
-                    long readBytes = 0;
+                    var buffer = new byte[BUFFER_SIZE];
+                    long readBytes;
                     long readIndex = 0;
-                    readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
+                    readBytes = reader.GetBytes(0, readIndex, buffer, 0, BUFFER_SIZE);
 
-                    while (readBytes == bufferSize)
+                    while (readBytes == BUFFER_SIZE)
                     {
                         onReadBinary(buffer);
-                        readIndex += bufferSize;
-                        readBytes = reader.GetBytes(0, readIndex, buffer, 0, bufferSize);
+                        readIndex += BUFFER_SIZE;
+                        readBytes = reader.GetBytes(0, readIndex, buffer, 0, BUFFER_SIZE);
                     }
 
                     onReadBinary(buffer);
@@ -867,7 +871,7 @@ namespace Library
             if (sql != _sql)
             {
                 cmd.CommandText = sql;
-                ParamToParam(cmd, parameters, false);
+                ParamToParam(cmd, parameters);
                 _sql = sql;
 
                 if (_prepare)
@@ -935,12 +939,10 @@ namespace Library
             if (!updateValues)
             {
                 cmd.Parameters.Clear();
-                foreach (var p in parameters)
-                {
+                foreach (var p in parameters) {
                     var v = cmd.Parameters.Add(new SqlParameter(p.Name, p.Type, p.Size));
 
-                    if (p.Type == SqlDbType.Decimal)
-                    {
+                    if (p.Type == SqlDbType.Decimal) {
                         if (p.Precision > 0)
                             v.Precision = p.Precision;
 
@@ -948,18 +950,17 @@ namespace Library
                             v.Scale = (byte)p.Size;
                     }
 
-                    if (p.Json)
-                    {
+                    if (p.Json) {
                         if (p.Type == SqlDbType.Variant)
                             p.Type = SqlDbType.VarChar;
 
                         v.Value = p.Value == null ? "null" : Configuration.JsonProvider.Serialize(p.Value);
+                        continue;
                     }
-                    else
-                        v.Value = (p.Value == null ? DBNull.Value : p.Value);
 
-
+                    v.Value = p.Value ?? DBNull.Value;
                 }
+
                 return;
             }
 
@@ -1016,23 +1017,21 @@ namespace Library
                 {
                     // TODO: neviem na čo to tu je
                     // param.Size = p.Size;
-                    param.Value = (p.Value == null ? DBNull.Value : p.Value);
+                    param.Value = p.Value ?? DBNull.Value;
                 }
             }
         }
 
         private void SetupString(SqlParameter param, bool sizeDeclared)
         {
-
             var str = param.Value as string;
-            if (string.IsNullOrEmpty(str))
-            {
+
+            if (string.IsNullOrEmpty(str)) {
                 param.Value = DBNull.Value;
                 return;
             }
 
-            if (sizeDeclared)
-            {
+            if (sizeDeclared) {
                 param.Value = str.Max(param.Size);
                 return;
             }
@@ -1164,17 +1163,17 @@ namespace Library
         public Sql(IDatabase db)
         {
             this.db = db;
-            this.TableName = DbUtils.GetTableName(typeof(T));
-            this.AutoLocking = true;
-            this.columns = Database.GetTableColumnCache(typeof(T));
+            TableName = DbUtils.GetTableName(typeof(T));
+            AutoLocking = true;
+            columns = Database.GetTableColumnCache(typeof(T));
         }
 
         public Sql(IDatabase db, bool autoLocking)
         {
             this.db = db;
-            this.TableName = DbUtils.GetTableName(typeof(T));
-            this.AutoLocking = autoLocking;
-            this.columns = Database.GetTableColumnCache(typeof(T));
+            TableName = DbUtils.GetTableName(typeof(T));
+            AutoLocking = autoLocking;
+            columns = Database.GetTableColumnCache(typeof(T));
         }
 
         public ISql<T> Use(Action<ISql<T>> declaration)
@@ -1257,7 +1256,7 @@ namespace Library
 
         public T FindByPK(object primaryKey, params string[] disablePropertyName)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             string p = null;
 
             foreach (var s in columns)
@@ -1276,7 +1275,7 @@ namespace Library
             if (string.IsNullOrEmpty(p))
                 throw new Exception("Primary key is not implemented.");
 
-            return Reader(string.Format("SELECT TOP 1 {0} FROM {1} WHERE {2}=@Id", sb.ToString(), GetTableNameSelect, p), new { Id = primaryKey }).FirstOrDefault();
+            return Reader(string.Format("SELECT TOP 1 {0} FROM {1} WHERE {2}=@Id", sb, GetTableNameSelect, p), new { Id = primaryKey }).FirstOrDefault();
         }
 
         public IEnumerable<T> GetAll(params OrderBy[] orderBy)
@@ -1308,10 +1307,10 @@ namespace Library
         {
             var r = GetColumns(OrderByCreate(orderBy, true), disablePropertyName);
 
-            if (this.db.Version > 10)
-                return Reader(string.Format("SELECT {0} FROM {1} ORDER BY {2} OFFSET {3} ROWS FETCH NEXT {4} ROWS ONLY", r.Raw.ToString(), GetTableNameSelect, r.OrderBy, skip, take));
+            if (db.Version > 10)
+                return Reader(string.Format("SELECT {0} FROM {1} ORDER BY {2} OFFSET {3} ROWS FETCH NEXT {4} ROWS ONLY", r.Raw, GetTableNameSelect, r.OrderBy, skip, take));
 
-            return Reader(string.Format("SELECT TOP {0} {5} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {3}) As rowindex, {1} FROM {2}) As _query WHERE _query.rowindex>{4} ORDER BY _query.rowindex", take, r.Clean.ToString(), GetTableNameSelect, r.OrderBy, skip, r.Raw.ToString()));
+            return Reader(string.Format("SELECT TOP {0} {5} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {3}) As rowindex, {1} FROM {2}) As _query WHERE _query.rowindex>{4} ORDER BY _query.rowindex", take, r.Clean, GetTableNameSelect, r.OrderBy, skip, r.Raw));
         }
 
         public IEnumerable<T> FindAll(SqlBuilder builder, params OrderBy[] orderBy)
@@ -1332,13 +1331,13 @@ namespace Library
         public IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, string[] disablePropertyName, params OrderBy[] orderBy)
         {
             var r = GetColumns(OrderByCreate(orderBy, true), disablePropertyName);
-            string sql = null;
+            string sql;
 
             // SQL Server 2012
-            if (this.db.Version > 10)
-                sql = string.Format("SELECT {0} FROM {1}{2} ORDER BY {3} OFFSET {4} ROWS FETCH NEXT {5} ROWS ONLY", r.Raw.ToString(), GetTableNameSelect, builder.ToString(true), r.OrderBy, skip, take);
+            if (db.Version > 10)
+                sql = string.Format("SELECT {0} FROM {1}{2} ORDER BY {3} OFFSET {4} ROWS FETCH NEXT {5} ROWS ONLY", r.Raw, GetTableNameSelect, builder.ToString(true), r.OrderBy, skip, take);
             else
-                sql = string.Format("SELECT TOP {0} {6} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {2}) As rowindex, {1} FROM {3}{4}) As _query WHERE _query.rowindex>{5} ORDER BY _query.rowindex", take, r.Clean.ToString(), r.OrderBy, GetTableNameSelect, builder.ToString(true), skip, r.Raw.ToString());
+                sql = string.Format("SELECT TOP {0} {6} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {2}) As rowindex, {1} FROM {3}{4}) As _query WHERE _query.rowindex>{5} ORDER BY _query.rowindex", take, r.Clean, r.OrderBy, GetTableNameSelect, builder.ToString(true), skip, r.Raw);
 
             return ReaderParam(sql, builder.Parameters);
         }
@@ -1393,7 +1392,7 @@ namespace Library
 
         public int Update(object arg, params string[] disablePropertyName)
         {
-            var hodnoty = new System.Text.StringBuilder();
+            var hodnoty = new StringBuilder();
             Column pk = null;
 
             var disabled = new Lazy<List<string>>();
@@ -1412,7 +1411,7 @@ namespace Library
             if (pk == null)
                 throw new Exception("Primary key is not implemented.");
 
-            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty.ToString(), pk.DbName + "=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
+            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, hodnoty, pk.DbName + "=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
         }
 
         public int Update(string where, object arg, params string[] disablePropertyName)
@@ -1422,7 +1421,7 @@ namespace Library
 
         public int Update(string where, object arg, object whereArg, params string[] disablePropertyName)
         {
-            var values = new System.Text.StringBuilder();
+            var values = new StringBuilder();
             var disabled = new Lazy<List<string>>();
             var isFilled = false;
 
@@ -1451,13 +1450,13 @@ namespace Library
             else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
-            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), where);
+            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values, where);
             return db.Execute(sql, p);
         }
 
         public int Update(SqlBuilder builder, object arg, params string[] disablePropertyName)
         {
-            var values = new System.Text.StringBuilder();
+            var values = new StringBuilder();
             var disabled = new Lazy<List<string>>();
             var isFilled = false;
 
@@ -1480,7 +1479,7 @@ namespace Library
             p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
             p.AddRange(builder.Parameters);
 
-            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values.ToString(), builder.ToString(true));
+            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values, builder.ToString(true));
             return db.Execute(sql, p);
         }
 
@@ -1490,7 +1489,7 @@ namespace Library
             if (propertyName == null || propertyName.Length == 0)
                 throw new Exception("You must define names of property.");
 
-            var values = new System.Text.StringBuilder();
+            var values = new StringBuilder();
             Column pk = null;
 
             var disabled = new Lazy<List<string>>();
@@ -1521,7 +1520,7 @@ namespace Library
             if (pk == null)
                 throw new Exception("Primary key is not implemented.");
 
-            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), '[' + pk.DbName + "]=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
+            return db.Execute(string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values, '[' + pk.DbName + "]=@" + pk.DbName), disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
         }
 
         public int UpdateOnly(string where, object arg, params string[] propertyName)
@@ -1534,7 +1533,7 @@ namespace Library
             if (propertyName == null || propertyName.Length == 0)
                 throw new Exception("You must define names of property.");
 
-            var values = new System.Text.StringBuilder();
+            var values = new StringBuilder();
             var disabled = new Lazy<List<string>>();
             var isFilled = false;
 
@@ -1567,7 +1566,7 @@ namespace Library
             else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
-            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values.ToString(), where);
+            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values, where);
             return db.Execute(sql, p);
         }
 
@@ -1576,7 +1575,7 @@ namespace Library
             if (propertyName == null || propertyName.Length == 0)
                 throw new Exception("You must define names of property.");
 
-            var values = new System.Text.StringBuilder();
+            var values = new StringBuilder();
             var disabled = new Lazy<List<string>>();
             var isFilled = false;
 
@@ -1603,7 +1602,7 @@ namespace Library
             p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
             p.AddRange(builder.Parameters);
 
-            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values.ToString(), builder.ToString(true));
+            var sql = string.Format("UPDATE {0} SET {1}{2}", GetTableNameUpdate, values, builder.ToString(true));
             return db.Execute(sql, p);
         }
 
@@ -1616,8 +1615,8 @@ namespace Library
 
         public object Insert(object arg, params string[] disablePropertyName)
         {
-            var column = new System.Text.StringBuilder();
-            var values = new System.Text.StringBuilder();
+            var column = new StringBuilder();
+            var values = new StringBuilder();
             var isFilled = false;
 
             Column pk = null;
@@ -1641,7 +1640,7 @@ namespace Library
                 }
             }
 
-            var sql = string.Format("INSERT INTO {0} ({1}) VALUES({2}); SELECT @@IDENTITY", GetTableNameUpdate, column.ToString(), values.ToString());
+            var sql = string.Format("INSERT INTO {0} ({1}) VALUES({2}); SELECT @@IDENTITY", GetTableNameUpdate, column, values);
 
             var v = Scalar(sql, arg);
 
@@ -1674,7 +1673,7 @@ namespace Library
 
             if (t == ConfigurationCache.type_guid)
             {
-                prop.SetValue(arg, (Guid)v, null);
+                prop.SetValue(arg, v, null);
                 return v;
             }
 
@@ -1723,7 +1722,7 @@ namespace Library
             if (t == ConfigurationCache.type_string)
             {
                 if (v != DBNull.Value)
-                    prop.SetValue(arg, (string)v, null);
+                    prop.SetValue(arg, v, null);
             }
 
             return v;
@@ -1767,7 +1766,7 @@ namespace Library
             r.Raw = new StringBuilder();
             r.OrderBy = orderBy;
 
-            var table = this.TableName + '.';
+            var table = TableName + '.';
 
             foreach (var s in columns)
             {
@@ -1795,7 +1794,7 @@ namespace Library
 
         private StringBuilder GetColumns(params string[] disablePropertyName)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             var isFilled = false;
 
             foreach (var s in columns)
@@ -1826,7 +1825,7 @@ namespace Library
                 return string.Empty;
 
             var isFilled = false;
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
 
             foreach (var i in o)
             {
@@ -1846,7 +1845,7 @@ namespace Library
             if (withoutDeclaration)
                 return sb.ToString();
 
-            return "ORDER BY " + sb.ToString();
+            return "ORDER BY " + sb;
         }
     }
     #endregion

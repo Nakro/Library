@@ -25,37 +25,37 @@ namespace Library
     #region Enums & Attributes & Classes & Interfaces
     public enum XmlSitemapFrequency
     {
-        always,
-        hourly,
-        daily,
-        weekly,
-        monthly,
-        yearly,
-        never
+        Always,
+        Hourly,
+        Daily,
+        Weekly,
+        Monthly,
+        Yearly,
+        Never
     }
 
     public enum XmlSitemapPriority
     {
-        random,
-        low,
-        medium,
-        high,
-        important
+        Random,
+        Low,
+        Medium,
+        High,
+        Important
     }
 
     public enum Authorization : byte
     {
-        logged = 0,
-        unlogged = 1,
-        forbidden = 2
+        Logged = 0,
+        Unlogged = 1,
+        Forbidden = 2
     }
 
     [Flags]
     public enum ConfigurationDefaults : byte
     {
-        web = 0,
-        analytics = 1,
-        cmd = 2
+        Web = 0,
+        Analytics = 1,
+        Cmd = 2
     }
 
     [AttributeUsage(AttributeTargets.Property)]
@@ -95,32 +95,32 @@ namespace Library
 
         public KeyValue(string key, string value)
         {
-            this.Key = key;
-            this.Value = value;
+            Key = key;
+            Value = value;
         }
 
         public KeyValue(string key, int value, bool autoFormat = true)
         {
-            this.Key = key;
-            this.Value = autoFormat ? value.Format() : value.ToString();
+            Key = key;
+            Value = autoFormat ? value.Format() : value.ToString();
         }
 
         public KeyValue(string key, decimal value, bool autoFormat = true)
         {
-            this.Key = key;
-            this.Value = autoFormat ? value.Format(2) : value.ToString();
+            Key = key;
+            Value = autoFormat ? value.Format(2) : value.ToString();
         }
 
         public KeyValue(string key, byte value)
         {
-            this.Key = key;
-            this.Value = value.ToString();
+            Key = key;
+            Value = value.ToString();
         }
 
         public KeyValue(string key, string format, params object[] param)
         {
-            this.Key = key;
-            this.Value = string.Format(Configuration.InvariantCulture, format, param);
+            Key = key;
+            Value = string.Format(Configuration.InvariantCulture, format, param);
         }
 
         public static KeyValue Create(string key, string value)
@@ -212,11 +212,11 @@ namespace Library
 
     public static class ConfigurationCache
     {
-        public static Type type_nodbparameter = typeof(Library.NoDbParameterAttribute);
-        public static Type type_dbskip = typeof(Library.DbSkipAttribute);
-        public static Type type_dbschema = typeof(Library.DbSchemaAttribute);
-        public static Type type_dbtable = typeof(Library.DbTableAttribute);
-        public static Type type_dbparameter = typeof(Library.DbParameterAttribute);
+        public static Type type_nodbparameter = typeof(NoDbParameterAttribute);
+        public static Type type_dbskip = typeof(DbSkipAttribute);
+        public static Type type_dbschema = typeof(DbSchemaAttribute);
+        public static Type type_dbtable = typeof(DbTableAttribute);
+        public static Type type_dbparameter = typeof(DbParameterAttribute);
         public static Type type_bool_null = typeof(bool?);
         public static Type type_bool = typeof(bool);
         public static Type type_int = typeof(int);
@@ -324,9 +324,9 @@ namespace Library
             get { return !HttpContext.Current.IsDebuggingEnabled; }
         }
 
-        public static void Defaults(ConfigurationDefaults defaults = ConfigurationDefaults.web)
+        public static void Defaults(ConfigurationDefaults defaults = ConfigurationDefaults.Web)
         {
-            if ((defaults & ConfigurationDefaults.cmd) != ConfigurationDefaults.cmd)
+            if ((defaults & ConfigurationDefaults.Cmd) != ConfigurationDefaults.Cmd)
             {
                 AreaRegistration.RegisterAllAreas();
                 GlobalFilters.Filters.Add(new HandleErrorAttribute());
@@ -454,7 +454,7 @@ namespace Library
             if (Configuration.OnVersion == null)
                 Configuration.OnVersion = n => n;
 
-            if ((defaults & ConfigurationDefaults.analytics) == ConfigurationDefaults.analytics)
+            if ((defaults & ConfigurationDefaults.Analytics) == ConfigurationDefaults.Analytics)
             {
                 Configuration.AnalyticsProvider = new Providers.DefaultAnalyticsProvider();
                 Analytics = new Library.Others.Analytics();
@@ -527,7 +527,7 @@ namespace Library
     #region Utils
     public static class Utils
     {
-        public static double GPS_distance_km(double latitudeA, double longitudeA, double latitudeB, double longitudeB)
+        public static double GpsDistanceKm(double latitudeA, double longitudeA, double latitudeB, double longitudeB)
         {
             var toRadian = new Func<double, double>(val => (Math.PI / 180) * val);
 
@@ -546,11 +546,11 @@ namespace Library
 
         public static void XmlSitemap(HttpResponse response, Action<Action<string, DateTime, XmlSitemapFrequency, XmlSitemapPriority>> fn)
         {
-            var priorita = new string[] { "0.1", "0.3", "0.5" };
+            var priorita = new [] { "0.1", "0.3", "0.5" };
             var prioritaIndex = 0;
 
             response.ContentType = "text/xml";
-            response.HeaderEncoding = System.Text.Encoding.UTF8;
+            response.HeaderEncoding = Encoding.UTF8;
             response.Write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + Environment.NewLine + "<urlset xmlns=\"http://www.google.com/schemas/sitemap/0.84\">" + Environment.NewLine);
 
             prioritaIndex++;
@@ -563,25 +563,25 @@ namespace Library
                 response.Write("  <url>" + Environment.NewLine);
                 response.Write("    <loc>" + url.Replace("&", "&amp;") + "</loc>" + Environment.NewLine);
                 response.Write("    <lastmod>" + date.ToString("yyyy-MM-dd") + "</lastmod>" + Environment.NewLine);
-                response.Write("    <changefreq>" + freq.ToString() + "</changefreq>" + Environment.NewLine);
+                response.Write("    <changefreq>" + freq + "</changefreq>" + Environment.NewLine);
 
                 var p = "";
 
                 switch (priority)
                 {
-                    case XmlSitemapPriority.random:
+                    case XmlSitemapPriority.Random:
                         p = priorita[prioritaIndex];
                         break;
-                    case XmlSitemapPriority.low:
+                    case XmlSitemapPriority.Low:
                         p = "0.1";
                         break;
-                    case XmlSitemapPriority.medium:
+                    case XmlSitemapPriority.Medium:
                         p = "0.4";
                         break;
-                    case XmlSitemapPriority.high:
+                    case XmlSitemapPriority.High:
                         p = "0.7";
                         break;
-                    case XmlSitemapPriority.important:
+                    case XmlSitemapPriority.Important:
                         p = "1.0";
                         break;
                 }
@@ -811,7 +811,7 @@ namespace Library
             {
                 if (tv != null)
                 {
-                    var intVal = 0;
+                    int intVal;
                     if (tv == ConfigurationCache.type_string)
                     {
                         if (Int32.TryParse(value.ToString().Replace(" ", ""), out intVal))
@@ -864,7 +864,7 @@ namespace Library
             {
                 if (tv != null)
                 {
-                    byte byteVal = 0;
+                    byte byteVal;
                     if (tv == ConfigurationCache.type_string)
                     {
                         if (Byte.TryParse(value.ToString().Replace(" ", ""), out byteVal))
@@ -919,7 +919,7 @@ namespace Library
             {
                 if (tv != null)
                 {
-                    Int64 int64Val = 0;
+                    Int64 int64Val;
                     if (tv == ConfigurationCache.type_string)
                     {
                         if (Int64.TryParse(value.ToString().Replace(" ", ""), out int64Val))
@@ -946,7 +946,7 @@ namespace Library
             {
                 if (tv != null)
                 {
-                    Int16 int16Val = 0;
+                    Int16 int16Val;
                     if (tv == ConfigurationCache.type_string)
                     {
                         if (Int16.TryParse(value.ToString().Replace(" ", ""), out int16Val))
@@ -1129,27 +1129,29 @@ namespace Library
 
             if (data != null && data.Length > 0)
             {
-                System.IO.StreamWriter writer = new System.IO.StreamWriter(request.GetRequestStream(), System.Text.Encoding.UTF8);
+                System.IO.StreamWriter writer = new System.IO.StreamWriter(request.GetRequestStream(), Encoding.UTF8);
+
                 if (data != null && data.Length > 0)
-                    writer.Write(data.ToString());
+                    writer.Write(data);
+
                 writer.Flush();
                 writer.Close();
             }
 
             var response = request.GetResponse();
 
-            using (System.IO.StreamReader Reader = new System.IO.StreamReader(response.GetResponseStream(), System.Text.Encoding.UTF8))
+            using (System.IO.StreamReader Reader = new System.IO.StreamReader(response.GetResponseStream(), Encoding.UTF8))
                 return Reader.ReadToEnd().JsonDeserialize<T>();
         }
 
-        public static string POST(string url, Action<Dictionary<string, string>> fnData, Action<System.Net.HttpWebRequest> options = null, System.Text.Encoding encoding = null)
+        public static string POST(string url, Action<Dictionary<string, string>> fnData, Action<System.Net.HttpWebRequest> options = null, Encoding encoding = null)
         {
             System.Net.HttpWebRequest r = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
             r.ContentType = "application/x-www-form-urlencoded";
             r.Method = "POST";
 
             if (encoding == null)
-                encoding = System.Text.Encoding.Default;
+                encoding = Encoding.Default;
 
             if (options != null)
                 options(r);
@@ -1160,22 +1162,22 @@ namespace Library
             fnData(data);
 
             foreach (var item in data)
-                sb.Append(string.Format("{0}={1}", item.Key, System.Web.HttpUtility.UrlEncode(item.Value)), "&");
+                sb.Append(string.Format("{0}={1}", item.Key, HttpUtility.UrlEncode(item.Value)), "&");
 
             System.IO.StreamWriter w = new System.IO.StreamWriter(r.GetRequestStream(), encoding);
-            w.Write(sb.ToString());
+            w.Write(sb);
             w.Flush();
             w.Close();
 
             var response = r.GetResponse();
 
-            using (System.IO.StreamReader Reader = new System.IO.StreamReader(response.GetResponseStream(), System.Text.Encoding.UTF8))
+            using (System.IO.StreamReader Reader = new System.IO.StreamReader(response.GetResponseStream(), Encoding.UTF8))
                 return Reader.ReadToEnd();
         }
 
         internal static string Token(int id, string token, bool session)
         {
-            var current = System.Web.HttpContext.Current;
+            var current = HttpContext.Current;
 
             if (session)
                 return string.Format("{0}X|{1}|{2}|{3}|{4}", id, current.Request.Browser.Browser, string.IsNullOrEmpty(Configuration.Name) ? current.Request.Url.Host.Replace("www.", "") : Configuration.Name, current.Request.UserHostAddress, token);
@@ -1260,7 +1262,7 @@ namespace Library
                     l.Add(arr[i].To<T>());
             }
 
-            return l.ToArray(); ;
+            return l.ToArray();
         }
 
         public static void LogFile(params object[] value)
@@ -1298,9 +1300,9 @@ namespace Library
             foreach (var address in to)
             {
                 var mail = new System.Net.Mail.MailMessage();
-                mail.SubjectEncoding = System.Text.Encoding.UTF8;
-                mail.HeadersEncoding = System.Text.Encoding.UTF8;
-                mail.BodyEncoding = System.Text.Encoding.UTF8;
+                mail.SubjectEncoding = Encoding.UTF8;
+                mail.HeadersEncoding = Encoding.UTF8;
+                mail.BodyEncoding = Encoding.UTF8;
 
                 try
                 {
@@ -1362,7 +1364,7 @@ namespace Library
             var index = 0;
             while (repeat)
             {
-                index = s.IndexOf("\\u", index);
+                index = s.IndexOf("\\u", index, StringComparison.InvariantCulture);
 
                 if (index == -1)
                 {
@@ -1388,7 +1390,7 @@ namespace Library
 
         public static string UnicodeEncode(string s)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             foreach (var c in s)
             {
                 var code = Convert.ToInt32(c);
@@ -1435,7 +1437,7 @@ namespace Library
         {
             using (var mail = new System.Net.Mail.MailMessage())
             {
-                var utf8 = System.Text.Encoding.UTF8;
+                var utf8 = Encoding.UTF8;
                 var body = System.Net.Mail.AlternateView.CreateAlternateViewFromString(source.RenderToString(name, model), utf8, "text/html");
                 mail.SubjectEncoding = utf8;
                 mail.HeadersEncoding = utf8;
@@ -1473,7 +1475,7 @@ namespace Library
                     return true;
             }
 
-            return allMustExist ? true : false;
+            return allMustExist;
         }
 
         public static void CopyTo(this object source, object target, params string[] withoutProperty)
@@ -1595,7 +1597,7 @@ namespace Library
         {
             if (string.IsNullOrEmpty(param))
                 return new { r = true }.ToJson();
-            return new { r = true, param = param }.ToJson();
+            return new { r = true, param }.ToJson();
         }
 
         public static ActionResult ToJsonError(this Controller source, string error, string language = "")
@@ -1635,7 +1637,7 @@ namespace Library
             return l;
         }
 
-        public static bool isXHR(this Controller source)
+        public static bool IsXHR(this Controller source)
         {
             return source.Request.IsAjaxRequest();
         }
@@ -1665,20 +1667,20 @@ namespace Library
             return source.ContentType.StartsWith("video/", StringComparison.InvariantCultureIgnoreCase);
         }
 
-        public static string JsCompress(this string source, System.Text.Encoding encoding = null)
+        public static string JsCompress(this string source, Encoding encoding = null)
         {
             if (string.IsNullOrEmpty(source))
                 return source;
 
             if (encoding == null)
-                encoding = System.Text.Encoding.Default;
+                encoding = Encoding.Default;
 
             var hash = "javascript." + EncryptDecrypt.Hash(source);
 
             return Utils.CacheRead<string>(hash, key =>
             {
                 var js = new Modules.JavaScriptMinifier();
-                var output = "";
+                string output;
 
                 using (var src = new System.IO.MemoryStream(encoding.GetBytes(source)))
                     output = js.Minify(src).Replace('\n', ' ');
@@ -1690,18 +1692,14 @@ namespace Library
             });
         }
 
-        public static string CssCompress(this string source, System.Text.Encoding encoding = null)
+        public static string CssCompress(this string source)
         {
             if (string.IsNullOrEmpty(source))
                 return source;
 
-            if (encoding == null)
-                encoding = System.Text.Encoding.Default;
-
             var hash = "css." + EncryptDecrypt.Hash(source);
 
-            return Utils.CacheRead<string>(hash, key =>
-            {
+            return Utils.CacheRead<string>(hash, key => {
                 var output = Modules.Less.Compile(source);
 
                 if (Configuration.IsRelease)
@@ -1722,7 +1720,7 @@ namespace Library
         public static bool IsJson(this string source)
         {
             if (string.IsNullOrEmpty(source))
-                return false; ;
+                return false;
 
             if (source.Length <= 1)
                 return false;
@@ -1845,6 +1843,9 @@ namespace Library
 
         public static ControllerCache Cache(this Controller source, string key, Action<Action<ControllerCache, DateTime?>> onEmpty)
         {
+            if (source == null)
+                throw new ArgumentNullException("source");
+
             return Utils.CacheRead<ControllerCache>(key, k =>
             {
                 ControllerCache cache = null;
@@ -1900,11 +1901,12 @@ namespace Library
             if (onReplace != null)
                 source.Value = onReplace(source.Key, source.Value);
 
-            return new KeyValue[1] { source }.ToJson();
+            return new [] { source }.ToJson();
         }
 
         public static ActionResult ToJsonError(this IEnumerable<KeyValue> source, string language = "", Func<string, string, string> onReplace = null)
         {
+            // Analysis disable once PossibleMultipleEnumeration
             foreach (var m in source)
             {
                 if (Configuration.OnResource != null && m.Value.IsNotEmpty() && m.Value[0] == '@')
@@ -2032,7 +2034,7 @@ namespace Library
             if (n.Length < 4)
                 return n;
 
-            for (int i = 0; i < n.ToString().Length; i++)
+            for (int i = 0; i < n.Length; i++)
                 s = (n[(n.Length - 1) - i]) + (i % 3 == 0 ? " " : string.Empty) + s;
             return s.Trim();
         }
@@ -2214,11 +2216,11 @@ namespace Library
             if (string.IsNullOrEmpty(source))
                 return source;
 
-            var sb = new System.Text.StringBuilder();
-            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(source.Trim(), "\\w+"))
+            var sb = new StringBuilder();
+            foreach (Match m in Regex.Matches(source.Trim(), "\\w+"))
                 sb.Append((sb.Length > 0 ? "-" : string.Empty) + RemoveDiakritics(m.Value.ToLower()).Trim());
 
-            var url = sb.ToString().Max(60, "");
+            var url = sb.ToString().Max(maxLength, "");
 
             if (url[url.Length - 1] == '-')
                 return url.Substring(0, url.Length - 1);
@@ -2241,13 +2243,13 @@ namespace Library
             if (string.IsNullOrEmpty(value))
                 return value;
 
-            string ns = value.Normalize(System.Text.NormalizationForm.FormD);
-            var sb = new System.Text.StringBuilder();
+            string ns = value.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder();
 
             for (int i = 0; i < ns.Length; i++)
             {
                 char c = ns[i];
-                if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
                     sb.Append(c);
             }
 
@@ -2260,7 +2262,7 @@ namespace Library
                 return value;
 
             char c;
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
 
             var ca = Utils.Asc('a');
             var cz = Utils.Asc('z');
@@ -2401,7 +2403,7 @@ namespace Library
             if (url == "/")
                 url = "";
 
-            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, new { controller = controller, action = action });
+            source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, new { controller, action });
         }
 
         public static void Route(this RouteCollection source, string url, object defaults)
@@ -2412,17 +2414,17 @@ namespace Library
             source.MapRoute(string.Format("{0}.{1}.{2}", url, controller, action).Hash("md5"), url, defaults);
         }
 
-        public static ContentResult ToJson(this object source, string contentType = "application/json", bool toUnicode = false)
+        public static ContentResult ToJson(this object source, string contentType = "application/json")
         {
-            return source.AsJson(contentType, toUnicode);
+            return source.AsJson(contentType);
         }
 
-        public static ContentResult AsJson(this object source, string contentType = "application/json", bool toUnicode = false)
+        public static ContentResult AsJson(this object source, string contentType = "application/json")
         {
             var content = new ContentResult();
             content.Content = source.JsonSerialize();
             content.ContentType = contentType;
-            content.ContentEncoding = System.Text.Encoding.UTF8;
+            content.ContentEncoding = Encoding.UTF8;
 
             // Solves problem with Safari
             HttpContext.Current.Response.Cache.SetCacheability(HttpCacheability.NoCache);
@@ -2660,7 +2662,7 @@ namespace Library
 
         public static string Join<T>(this T[] source, string delimiter = ", ")
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             foreach (T i in source)
                 sb.Append((sb.Length > 0 ? delimiter : string.Empty) + Utils.To<string>(i));
             return sb.ToString();
@@ -2668,7 +2670,7 @@ namespace Library
 
         public static string Join<T>(this IList<T> source, string delimiter = ", ")
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             foreach (T i in source)
                 sb.Append((sb.Length > 0 ? delimiter : string.Empty) + Utils.To<string>(i));
             return sb.ToString();
@@ -2721,36 +2723,36 @@ namespace Library
 
         public static string RegExReplace(this string source, string pattern, string replaceTo)
         {
-            return System.Text.RegularExpressions.Regex.Replace(source, pattern, replaceTo);
+            return Regex.Replace(source, pattern, replaceTo);
         }
 
-        public static System.Text.RegularExpressions.Match RegExMatch(this string source, string pattern)
+        public static Match RegExMatch(this string source, string pattern)
         {
-            return System.Text.RegularExpressions.Regex.Match(source, pattern);
+            return Regex.Match(source, pattern);
         }
 
         public static bool RegExContains(this string source, string pattern)
         {
-            return System.Text.RegularExpressions.Regex.Match(source, pattern).Success;
+            return Regex.Match(source, pattern).Success;
         }
 
-        public static System.Text.RegularExpressions.MatchCollection RegExMatches(this string source, string pattern)
+        public static MatchCollection RegExMatches(this string source, string pattern)
         {
-            return System.Text.RegularExpressions.Regex.Matches(source, pattern);
+            return Regex.Matches(source, pattern);
         }
 
         public static string UrlEncode(this string source)
         {
             if (string.IsNullOrEmpty(source))
                 return source;
-            return System.Web.HttpUtility.UrlEncode(source);
+            return HttpUtility.UrlEncode(source);
         }
 
         public static string UrlDecode(this string source)
         {
             if (string.IsNullOrEmpty(source))
                 return source;
-            return System.Web.HttpUtility.UrlDecode(source);
+            return HttpUtility.UrlDecode(source);
         }
 
         public static string HtmlEncode(this string source)
@@ -2813,7 +2815,7 @@ namespace Library
 
         public static T FindId<T>(this string source, bool fromBeg = true, char divider = '-')
         {
-            var index = 0;
+            int index;
 
             if (fromBeg)
             {
@@ -2854,10 +2856,10 @@ namespace Library
             var zoznam = new Dictionary<string, int>(10);
             var tmp = new Dictionary<string, string>(10);
 
-            foreach (System.Text.RegularExpressions.Match m in source.RegExMatches("\\w{" + minLength + ",}"))
+            foreach (Match m in source.RegExMatches("\\w{" + minLength + ",}"))
             {
                 var key = (strict ? m.Value : m.Value.ToLower().RemoveDiakritics().Replace('y', 'i'));
-                var value = m.Value;
+                string value;
 
                 if (tmp.TryGetValue(key, out value))
                 {
@@ -2905,12 +2907,12 @@ namespace Library
 
             foreach (var m in source.Split('\n'))
             {
-                var value = ParseKeyValue(source);
+                var value = ParseKeyValue(m);
                 if (value != null)
                     zoznam.Add(value);
             }
 
-            return null;
+            return zoznam;
         }
 
         public static KeyValue ParseKeyValue(this string source)
@@ -3023,26 +3025,26 @@ namespace Library
             }
         }
 
-        private System.Drawing.Bitmap BMP = null;
+        private Bitmap BMP = null;
         public bool IsLoaded { get; set; }
 
-        public System.Drawing.Bitmap Bitmap
+        public Bitmap Bitmap
         {
-            get { return this.BMP; }
-            set { this.BMP = value; }
+            get { return BMP; }
+            set { BMP = value; }
         }
 
         public int Width
         {
-            get { return (this.BMP != null ? this.BMP.Width : 0); }
+            get { return (BMP != null ? BMP.Width : 0); }
         }
 
         public int Height
         {
-            get { return (this.BMP != null ? this.BMP.Height : 0); }
+            get { return BMP == null ? 0 : BMP.Height; }
         }
 
-        public static double ColorCompare(System.Drawing.Color color1, System.Drawing.Color color2)
+        public static double ColorCompare(Color color1, Color color2)
         {
             return Math.Sqrt(Math.Pow(Convert.ToDouble(color1.B) - Convert.ToDouble(color2.B), 2.0) + Math.Pow(Convert.ToDouble(color1.G) - Convert.ToDouble(color2.G), 2.0) + Math.Pow(Convert.ToDouble(color1.R) - Convert.ToDouble(color2.R), 2.0));
         }
@@ -3070,7 +3072,6 @@ namespace Library
 
         public byte[] SaveAsJpg(uint quality)
         {
-            System.Drawing.Imaging.EncoderParameter Param = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
             System.Drawing.Imaging.ImageCodecInfo jpegCodec = GetEncoderInfo("image/jpeg");
             System.Drawing.Imaging.EncoderParameters encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
             encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
@@ -3092,7 +3093,6 @@ namespace Library
 
         public void SaveToStreamJpg(System.IO.Stream stream, uint quality)
         {
-            System.Drawing.Imaging.EncoderParameter Param = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
             System.Drawing.Imaging.ImageCodecInfo jpegCodec = GetEncoderInfo("image/jpeg");
             System.Drawing.Imaging.EncoderParameters encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
             encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
@@ -3100,17 +3100,17 @@ namespace Library
                 b.Save(stream, jpegCodec, encoderParams);
         }
 
-        public System.Drawing.Color Pixel(int X, int Y)
+        public Color Pixel(int x, int y)
         {
-            return BMP.GetPixel(X, Y);
+            return BMP.GetPixel(x, y);
         }
 
-        public System.Drawing.Color Pixel()
+        public Color Pixel()
         {
             return BMP.GetPixel(1, 1);
         }
 
-        public System.Drawing.Graphics Graphics
+        public Graphics Graphics
         {
             get { return System.Drawing.Graphics.FromImage(BMP); }
         }
@@ -3135,15 +3135,15 @@ namespace Library
             IsLoaded = LoadFromStream(stream);
         }
 
-        public ImageConverter(System.Drawing.Image image)
+        public ImageConverter(Image image)
         {
-            BMP = new System.Drawing.Bitmap(image);
+            BMP = new Bitmap(image);
             BMP.SetResolution(80, 60);
         }
 
         public ImageConverter(int width, int height)
         {
-            BMP = new System.Drawing.Bitmap(width, height);
+            BMP = new Bitmap(width, height);
             BMP.SetResolution(80, 60);
             IsLoaded = true;
         }
@@ -3158,7 +3158,7 @@ namespace Library
 
             try
             {
-                BMP = new System.Drawing.Bitmap(fileName);
+                BMP = new Bitmap(fileName);
                 BMP.SetResolution(80, 60);
             }
             catch
@@ -3175,7 +3175,7 @@ namespace Library
         {
             try
             {
-                BMP = new System.Drawing.Bitmap(stream);
+                BMP = new Bitmap(stream);
                 BMP.SetResolution(80, 60);
             }
             catch
@@ -3196,7 +3196,7 @@ namespace Library
                 {
                     using (var MemoryStream = new System.IO.MemoryStream(fileData))
                     {
-                        BMP = new System.Drawing.Bitmap(MemoryStream);
+                        BMP = new Bitmap(MemoryStream);
                         BMP.SetResolution(80, 60);
                         IsLoaded = true;
                         return true;
@@ -3253,7 +3253,7 @@ namespace Library
         {
             if (!CheckBitmap())
                 return this;
-            System.IO.File.WriteAllBytes(fileName, this.SaveAsJpg(quality));
+            System.IO.File.WriteAllBytes(fileName, SaveAsJpg (quality));
             return this;
         }
 
@@ -3280,7 +3280,7 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            var newBMP = new System.Drawing.Bitmap(width, height);
+            var newBMP = new Bitmap(width, height);
             newBMP.SetResolution(80, 60);
 
             using (var picture = System.Drawing.Graphics.FromImage(newBMP))
@@ -3298,11 +3298,8 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            int BmpWidth = 0;
-            int BmpHeight = 0;
-
-            BmpWidth = width;
-            BmpHeight = (int)(Math.Round((double)width / ((double)BMP.Width / (double)BMP.Height)));
+            int BmpWidth = width;
+            int BmpHeight = (int)(Math.Round((double)width / ((double)BMP.Width / (double)BMP.Height)));
             Resize(BmpWidth, BmpHeight, resizeFilter);
             return this;
         }
@@ -3312,35 +3309,35 @@ namespace Library
 
             if (width >= height)
             {
-                if (this.Width > this.Height)
-                    this.ResizeHeight(height, resizeFilter);
+                if (Width > Height)
+                    ResizeHeight(height, resizeFilter);
                 else
-                    this.ResizeWidth(width, resizeFilter);
+                    ResizeWidth(width, resizeFilter);
             }
             else
             {
-                if (this.Height > this.Width)
-                    this.ResizeHeight(height, resizeFilter);
+                if (Height > Width)
+                    ResizeHeight(height, resizeFilter);
                 else
-                    this.ResizeWidth(width, resizeFilter);
+                    ResizeWidth(width, resizeFilter);
             }
 
-            this.SetSize(new System.Drawing.SolidBrush(this.Pixel(1, 1)), width, height, width / 2 - this.Width / 2, height / 2 - this.Height / 2);
+            SetSize(new SolidBrush(Pixel(1, 1)), width, height, width / 2 - Width / 2, height / 2 - Height / 2);
             return this;
         }
 
-        public ImageConverter SetSize(System.Drawing.Brush background, int width, int height, float X, float Y)
+        public ImageConverter SetSize(Brush background, int width, int height, float x, float y)
         {
             if (!CheckBitmap())
                 return this;
 
-            var newBMP = new System.Drawing.Bitmap(width, height);
+            var newBMP = new Bitmap(width, height);
             newBMP.SetResolution(80, 60);
 
             using (var g = Graphics.FromImage(newBMP))
             {
-                g.FillRegion(background, new System.Drawing.Region(new System.Drawing.Rectangle(0, 0, width, height)));
-                g.DrawImage(BMP, X, Y, BMP.Width, BMP.Height);
+                g.FillRegion(background, new Region(new Rectangle(0, 0, width, height)));
+                g.DrawImage(BMP, x, y, BMP.Width, BMP.Height);
             }
 
             BMP.Dispose();
@@ -3348,18 +3345,18 @@ namespace Library
             return this;
         }
 
-        public ImageConverter SetPosition(System.Drawing.Brush background, float X, float Y)
+        public ImageConverter SetPosition(Brush background, float x, float y)
         {
             if (!CheckBitmap())
                 return this;
 
-            var newBMP = new System.Drawing.Bitmap(BMP.Width, BMP.Height);
+            var newBMP = new Bitmap(BMP.Width, BMP.Height);
             newBMP.SetResolution(80, 60);
 
             using (var g = Graphics.FromImage(newBMP))
             {
-                g.FillRegion(background, new System.Drawing.Region(new System.Drawing.Rectangle(0, 0, Width, Height)));
-                g.DrawImage(BMP, X, Y, BMP.Width, BMP.Height);
+                g.FillRegion(background, new Region(new Rectangle(0, 0, Width, Height)));
+                g.DrawImage(BMP, x, y, BMP.Width, BMP.Height);
             }
 
             BMP.Dispose();
@@ -3372,8 +3369,8 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            int BmpWidth = 0;
-            int BmpHeight = 0;
+            int BmpWidth;
+            int BmpHeight;
 
             BmpHeight = heigth;
             BmpWidth = (int)(Math.Round(Convert.ToDouble(heigth) / ((double)BMP.Height / (double)BMP.Width)));
@@ -3391,7 +3388,7 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            using (var newBMP = new System.Drawing.Bitmap(new System.IO.MemoryStream(fileData)))
+            using (var newBMP = new Bitmap(new System.IO.MemoryStream(fileData)))
             {
                 newBMP.SetResolution(80, 60);
                 var b = ApplyOpacity(newBMP, opacity);
@@ -3422,15 +3419,15 @@ namespace Library
             return this;
         }
 
-        public ImageConverter ResizeTo(int width, int height, System.Drawing.Brush background, System.Drawing.Drawing2D.InterpolationMode resizeFilter)
+        public ImageConverter ResizeTo(int width, int height, Brush background, System.Drawing.Drawing2D.InterpolationMode resizeFilter)
         {
             if (!CheckBitmap())
                 return this;
 
-            int BmpWidth = 0;
-            int BmpHeight = 0;
-            int x = 0;
-            int y = 0;
+            int BmpWidth;
+            int BmpHeight;
+            int x;
+            int y;
 
             if (BMP.Width > BMP.Height)
             {
@@ -3469,12 +3466,12 @@ namespace Library
                 }
             }
 
-            System.Drawing.Bitmap newBMP = new System.Drawing.Bitmap(width, height);
+            Bitmap newBMP = new Bitmap(width, height);
             newBMP.SetResolution(80, 60);
 
             using (var picture = System.Drawing.Graphics.FromImage(newBMP))
             {
-                picture.FillRegion(background, new System.Drawing.Region(new System.Drawing.Rectangle(0, 0, width, height)));
+                picture.FillRegion(background, new Region(new Rectangle(0, 0, width, height)));
 
                 x = (width / 2) - (BmpWidth / 2);
                 y = (height / 2) - (BmpHeight / 2);
@@ -3493,8 +3490,8 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            System.Drawing.Rectangle r = new System.Drawing.Rectangle(left, top, BMP.Width - right, BMP.Height - bottom);
-            System.Drawing.Bitmap newBMP = BMP.Clone(r, BMP.PixelFormat);
+            Rectangle r = new Rectangle(left, top, BMP.Width - right, BMP.Height - bottom);
+            Bitmap newBMP = BMP.Clone(r, BMP.PixelFormat);
             BMP.Dispose();
             BMP = newBMP;
             return this;
@@ -3516,23 +3513,23 @@ namespace Library
             }
         }
 
-        public ImageConverter Rotate(System.Drawing.Brush background, float angle)
+        public ImageConverter Rotate(Brush background, float angle)
         {
             if (!CheckBitmap())
                 return this;
 
-            System.Drawing.Bitmap returnBitmap = new System.Drawing.Bitmap(BMP.Width, BMP.Height);
+            Bitmap returnBitmap = new Bitmap(BMP.Width, BMP.Height);
             returnBitmap.SetResolution(80, 60);
 
             using (var g = System.Drawing.Graphics.FromImage(returnBitmap))
             {
                 g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
-                g.FillRegion(background, new System.Drawing.Region(new System.Drawing.Rectangle(0, 0, Width, Height)));
+                g.FillRegion(background, new Region(new Rectangle(0, 0, Width, Height)));
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 g.TranslateTransform((float)BMP.Width / 2, (float)BMP.Height / 2);
                 g.RotateTransform(angle);
                 g.TranslateTransform(-(float)BMP.Width / 2, -(float)BMP.Height / 2);
-                g.DrawImage(BMP, new System.Drawing.Point(0, 0));
+                g.DrawImage(BMP, new Point(0, 0));
                 BMP.Dispose();
                 BMP = returnBitmap;
             }
@@ -3544,7 +3541,7 @@ namespace Library
             if (!CheckBitmap())
                 return this;
 
-            var newBitmap = new System.Drawing.Bitmap(BMP.Width, BMP.Height);
+            var newBitmap = new Bitmap(BMP.Width, BMP.Height);
             newBitmap.SetResolution(80, 60);
 
             using (var g = System.Drawing.Graphics.FromImage(newBitmap))
@@ -3564,7 +3561,7 @@ namespace Library
         public static Bitmap GrayScale(Bitmap bmp)
         {
 
-            var newBitmap = new System.Drawing.Bitmap(bmp.Width, bmp.Height);
+            var newBitmap = new Bitmap(bmp.Width, bmp.Height);
             newBitmap.SetResolution(80, 60);
 
             using (var g = System.Drawing.Graphics.FromImage(newBitmap))
@@ -3581,7 +3578,7 @@ namespace Library
 
         public ImageConverter SetOpacity(float opacity)
         {
-            using (var bmp = new System.Drawing.Bitmap(BMP.Width, BMP.Height))
+            using (var bmp = new Bitmap(BMP.Width, BMP.Height))
             {
                 bmp.SetResolution(80, 60);
                 using (var bmpGraphics = System.Drawing.Graphics.FromImage(bmp))
@@ -3590,7 +3587,7 @@ namespace Library
                     colorMatrix.Matrix33 = opacity;
                     var imageAttribute = new System.Drawing.Imaging.ImageAttributes();
                     imageAttribute.SetColorMatrix(colorMatrix, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                    bmpGraphics.DrawImage(BMP, new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, System.Drawing.GraphicsUnit.Pixel, imageAttribute);
+                    bmpGraphics.DrawImage(BMP, new Rectangle(0, 0, bmp.Width, bmp.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, imageAttribute);
                     BMP.Dispose();
                     BMP = bmp;
                     return this;
@@ -3600,7 +3597,7 @@ namespace Library
 
         public static Bitmap ApplyOpacity(Bitmap b, float opacity)
         {
-            var nb = new System.Drawing.Bitmap(b.Width, b.Height);
+            var nb = new Bitmap(b.Width, b.Height);
             nb.SetResolution(80, 60);
             using (var bmpGraphics = System.Drawing.Graphics.FromImage(b))
             {
@@ -3608,7 +3605,7 @@ namespace Library
                 colorMatrix.Matrix33 = opacity;
                 var imageAttribute = new System.Drawing.Imaging.ImageAttributes();
                 imageAttribute.SetColorMatrix(colorMatrix, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                bmpGraphics.DrawImage(b, new System.Drawing.Rectangle(0, 0, nb.Width, nb.Height), 0, 0, nb.Width, nb.Height, System.Drawing.GraphicsUnit.Pixel, imageAttribute);
+                bmpGraphics.DrawImage(b, new Rectangle(0, 0, nb.Width, nb.Height), 0, 0, nb.Width, nb.Height, GraphicsUnit.Pixel, imageAttribute);
                 return b;
             }
         }
@@ -4029,7 +4026,7 @@ namespace Library
 
         public string ToUrl()
         {
-            return Configuration.OnImageParserUrl(this.Dimension, this);
+            return Configuration.OnImageParserUrl(Dimension, this);
         }
 
         public string ToUrl(string dimension)
@@ -4090,7 +4087,7 @@ namespace Library
 
         public ImageParser Resize(string dimension)
         {
-            this.Dimension = dimension;
+            Dimension = dimension;
 
             if (Configuration.OnImageParserDimension == null)
                 return this;
@@ -4099,8 +4096,8 @@ namespace Library
             if (size.IsEmpty)
                 return this;
 
-            this.Width = size.Width;
-            this.Height = size.Height;
+            Width = size.Width;
+            Height = size.Height;
             return this;
         }
 
@@ -4111,7 +4108,7 @@ namespace Library
 
         public string Render(string className = "")
         {
-            return string.Format("<img src=\"{0}\"{1}{2} alt=\"{3}\" border=\"0\"{4} />", Configuration.OnImageParserUrl(this.Dimension, this), Width > 0 ? string.Format(" width=\"{0}\"", Width) : "", Height > 0 ? string.Format(" height=\"{0}\"", Height) : "", Name, string.IsNullOrEmpty(className) ? "" : string.Format(" class=\"{0}\"", className));
+            return string.Format("<img src=\"{0}\"{1}{2} alt=\"{3}\" border=\"0\"{4} />", Configuration.OnImageParserUrl(Dimension, this), Width > 0 ? string.Format(" width=\"{0}\"", Width) : "", Height > 0 ? string.Format(" height=\"{0}\"", Height) : "", Name, string.IsNullOrEmpty(className) ? "" : string.Format(" class=\"{0}\"", className));
         }
     }
     #endregion
@@ -4160,7 +4157,7 @@ namespace Library
 
             try
             {
-                Items.Add(new Schedule() { Name = name, Count = 0, Index = 0, Minutes = minutes, OnTick = onTick });
+                Items.Add(new Schedule { Name = name, Count = 0, Index = 0, Minutes = minutes, OnTick = onTick });
 
                 handle = new System.Threading.AutoResetEvent(false);
                 System.Threading.ThreadPool.RegisterWaitForSingleObject(handle, (state, timeout) =>
@@ -4297,13 +4294,13 @@ namespace Library
                     OnOffline(k.Key, k.Value.Value);
             }
 
-            if (this.OnSchedule != null)
-                this.OnSchedule();
+            if (OnSchedule != null)
+                OnSchedule();
         }
 
         public V Add(K key, V value, DateTime expire)
         {
-            Item obj = null;
+            Item obj;
             var ticks = expire.Ticks(true);
 
             if (Items.TryGetValue(key, out obj))
@@ -4313,7 +4310,7 @@ namespace Library
                 return value;
             }
 
-            Items.TryAdd(key, new Item() { Expire = ticks, Value = value });
+            Items.TryAdd(key, new Item { Expire = ticks, Value = value });
 
             if (OnOnline != null)
                 OnOnline(key, value);
@@ -4323,7 +4320,7 @@ namespace Library
 
         public bool SetExpire(K key, DateTime expire)
         {
-            Item obj = null;
+            Item obj;
 
             if (!Items.TryGetValue(key, out obj))
                 return false;
@@ -4334,7 +4331,7 @@ namespace Library
 
         public bool Remove(K key)
         {
-            Item obj = null;
+            Item obj;
             var isDeleted = Items.TryRemove(key, out obj);
 
             if (OnOffline != null && obj != null)
@@ -4345,7 +4342,7 @@ namespace Library
 
         public V Read(K key)
         {
-            Item obj = null;
+            Item obj;
             if (Items.TryGetValue(key, out obj))
                 return obj.Value;
             return default(V);
@@ -4373,57 +4370,57 @@ namespace Library
 
         public enum MarkdownListType : byte
         {
-            plus = 0,
-            minus = 1,
-            x = 2
+            Plus = 0,
+            Minus = 1,
+            X = 2
         }
 
         public enum MarkdownBreakType : byte
         {
-            newline = 0,
-            line = 1,
-            pagebreak = 2
+            Newline = 0,
+            Line = 1,
+            Pagebreak = 2
         }
 
         public enum MarkdownParagraphType : byte
         {
-            gt = 0,
-            slash = 1,
-            comment = 2,
-            line = 3
+            Gt = 0,
+            Slash = 1,
+            Comment = 2,
+            Line = 3
         }
 
         public enum MarkdownTitleType : byte
         {
-            h1 = 0,
-            h2 = 1,
-            h3 = 2,
-            h4 = 5,
-            h5 = 6,
-            h6 = 7
+            H1 = 0,
+            H2 = 1,
+            H3 = 2,
+            H4 = 5,
+            H5 = 6,
+            H6 = 7
         }
 
         public enum MarkdownKeywordType : byte
         {
-            composite = 0,
-            square = 1
+            Composite = 0,
+            Square = 1
         }
 
         public enum MarkdownFormatType : byte
         {
-            b = 0,
-            strong = 1,
-            i = 2,
-            em = 3
+            B = 0,
+            Strong = 1,
+            I = 2,
+            Em = 3
         }
 
         private enum MarkdownParserType : byte
         {
-            empty = 0,
-            paragraph = 100,
-            embedded = 101,
-            list = 102,
-            keyvalue = 103
+            Empty = 0,
+            Paragraph = 100,
+            Embedded = 101,
+            List = 102,
+            Keyvalue = 103
         }
 
         public class MarkdownList
@@ -4465,7 +4462,7 @@ namespace Library
 
         private bool skip = false;
         private string command = "";
-        private MarkdownParserType status = MarkdownParserType.empty;
+        private MarkdownParserType status = MarkdownParserType.Empty;
 
         private List<string> current = new List<string>(2);
         private List<KeyValue> format = new List<KeyValue>(2);
@@ -4474,28 +4471,25 @@ namespace Library
 
         private string output = "";
 
-        private static Regex reg_link_1 = new Regex(@"\<.*?\>+", RegexOptions.Compiled);
-        private static Regex reg_link_2 = new Regex(@"(!)?\[[^\]]+\][\:\s\(]+.*?[^)\s$]+", RegexOptions.Compiled);
-        private static Regex reg_link_3 = new Regex(@"(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static Regex reg_link_4 = new Regex(@"(^|[^\/])(www\.[\S]+(\b|$))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex reg_image = new Regex(@"(\[)?\!\[[^\]]+\][\:\s\(]+.*?[^\s$]+", RegexOptions.Compiled);
-        private static Regex reg_format = new Regex(@"\*{1,2}.*?\*{1,2}|_{1,3}.*?_{1,3}", RegexOptions.Compiled);
-        private static Regex reg_keyword = new Regex(@"(\[.*?\]|\{.*?\})", RegexOptions.Compiled);
-        private static Regex reg_format_replace_asterix = new Regex(@"^\*{1,2}|\*{1,2}$", RegexOptions.Compiled);
-        private static Regex reg_format_replace_underscore = new Regex(@"^_{1,2}|_{1,2}$$", RegexOptions.Compiled);
+        private static readonly Regex reg_link_1 = new Regex(@"\<.*?\>+", RegexOptions.Compiled);
+        private static readonly Regex reg_link_2 = new Regex(@"(!)?\[[^\]]+\][\:\s\(]+.*?[^)\s$]+", RegexOptions.Compiled);
+        private static readonly Regex reg_link_3 = new Regex(@"(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex reg_link_4 = new Regex(@"(^|[^\/])(www\.[\S]+(\b|$))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex reg_image = new Regex(@"(\[)?\!\[[^\]]+\][\:\s\(]+.*?[^\s$]+", RegexOptions.Compiled);
+        private static readonly Regex reg_format = new Regex(@"\*{1,2}.*?\*{1,2}|_{1,3}.*?_{1,3}", RegexOptions.Compiled);
+        private static readonly Regex reg_keyword = new Regex(@"(\[.*?\]|\{.*?\})", RegexOptions.Compiled);
+        private static readonly Regex reg_format_replace_asterix = new Regex(@"^\*{1,2}|\*{1,2}$", RegexOptions.Compiled);
+        private static readonly Regex reg_format_replace_underscore = new Regex(@"^_{1,2}|_{1,2}$$", RegexOptions.Compiled);
 
         public Markdown()
         {
             Embedded = "===";
 
-            OnEmbedded = (type, lines) =>
-            {
-                return lines.Join("\n");
-            };
+            OnEmbedded = (type, lines) => lines.Join("\n");
 
             OnLink = (text, url) =>
             {
-                if (!(url.StartsWith("https://") || url.StartsWith("http://")))
+                if (!(url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase)))
                     url = "http://" + url;
                 return string.Format("<a href=\"{1}\">{0}</a>", text, url);
             };
@@ -4505,13 +4499,13 @@ namespace Library
                 var format = "<{0}>{1}</{0}>";
                 switch (type)
                 {
-                    case MarkdownFormatType.b:
+                    case MarkdownFormatType.B:
                         return string.Format(format, "b", value);
-                    case MarkdownFormatType.strong:
+                    case MarkdownFormatType.Strong:
                         return string.Format(format, "strong", value);
-                    case MarkdownFormatType.em:
+                    case MarkdownFormatType.Em:
                         return string.Format(format, "em", value);
-                    case MarkdownFormatType.i:
+                    case MarkdownFormatType.I:
                         return string.Format(format, "i", value);
                 }
                 return "";
@@ -4519,7 +4513,7 @@ namespace Library
 
             OnImage = (alt, src, width, height, url) =>
             {
-                var sb = new System.Text.StringBuilder();
+                var sb = new StringBuilder();
                 sb.Append("<img");
                 sb.AppendAttribute("alt", alt);
                 sb.AppendAttribute("src", src);
@@ -4534,55 +4528,42 @@ namespace Library
                 sb.Append(" />");
 
                 if (url.IsNotEmpty())
-                    return string.Format("<a href=\"{0}\">{1}</a>", url, sb.ToString());
+                    return string.Format("<a href=\"{0}\">{1}</a>", url, sb);
 
                 return sb.ToString();
             };
 
-            OnKeyword = (type, value) =>
-            {
-                return "<span>{0}</span>".format(value);
-            };
+            OnKeyword = (type, value) => "<span>{0}</span>".format(value);
 
-            OnKeyValue = (items) =>
-            {
-                var sb = new System.Text.StringBuilder();
+            OnKeyValue = items => {
+                var sb = new StringBuilder();
 
                 foreach (var m in items)
                     sb.Append(string.Format("<dt>{0}</dt><dd>{1}</dd>", m.Key, m.Value));
 
-                return string.Format("<dl>{0}</dl>", sb.ToString());
+                return string.Format("<dl>{0}</dl>", sb);
             };
 
-            OnList = (items) =>
-            {
-                var sb = new System.Text.StringBuilder();
+            OnList = items => {
+                var sb = new StringBuilder();
 
                 foreach (var m in items)
                     sb.Append(string.Format("<li>{0}</li>", m.Value));
 
-                return string.Format("<ul>{0}</ul>", sb.ToString());
+                return string.Format("<ul>{0}</ul>", sb);
             };
 
-            OnParagraph = (type, lines) =>
-            {
-                return string.Format("<p class=\"paragraph\">{0}</p>", lines.Join("<br />"));
-            };
+            OnParagraph = (type, lines) => string.Format("<p class=\"paragraph\">{0}</p>", lines.Join("<br />"));
 
-            OnLine = (line) =>
-            {
-                return string.Format("<p>{0}</p>", line);
-            };
+            OnLine = line => string.Format("<p>{0}</p>", line);
 
-            OnBreak = (type) =>
-            {
-                switch (type)
-                {
-                    case MarkdownBreakType.line:
-                    case MarkdownBreakType.pagebreak:
-                        return "<hr />";
-                    case MarkdownBreakType.newline:
-                        return "<br />";
+            OnBreak = type => {
+                switch (type) {
+                case MarkdownBreakType.Line:
+                case MarkdownBreakType.Pagebreak:
+                    return "<hr />";
+                case MarkdownBreakType.Newline:
+                    return "<br />";
                 }
 
                 return "";
@@ -4592,15 +4573,15 @@ namespace Library
             {
                 switch (type)
                 {
-                    case MarkdownTitleType.h1:
+                    case MarkdownTitleType.H1:
                         return string.Format("<h1>{0}</h1>", value);
-                    case MarkdownTitleType.h2:
+                    case MarkdownTitleType.H2:
                         return string.Format("<h2>{0}</h2>", value);
-                    case MarkdownTitleType.h3:
+                    case MarkdownTitleType.H3:
                         return string.Format("<h3>{0}</h3>", value);
-                    case MarkdownTitleType.h4:
+                    case MarkdownTitleType.H4:
                         return string.Format("<h4>{0}</h4>", value);
-                    case MarkdownTitleType.h5:
+                    case MarkdownTitleType.H5:
                         return string.Format("<h5>{0}</h5>", value);
                 }
 
@@ -4617,8 +4598,8 @@ namespace Library
             var arr = text.Split('\n');
             var length = arr.Length;
 
-            this.output = "";
-            this.status = MarkdownParserType.empty;
+            output = "";
+            status = MarkdownParserType.Empty;
 
             if (current.Count > 0)
                 current.Clear();
@@ -4664,7 +4645,7 @@ namespace Library
                     output += OnLine(ParseOther(line));
             }
 
-            if (status != MarkdownParserType.empty)
+            if (status != MarkdownParserType.Empty)
                 Flush();
 
             return output;
@@ -4674,35 +4655,35 @@ namespace Library
         {
             switch (status)
             {
-                case MarkdownParserType.embedded:
+                case MarkdownParserType.Embedded:
                     if (OnEmbedded != null)
                         output += OnEmbedded(command, current);
                     break;
 
-                case MarkdownParserType.list:
+                case MarkdownParserType.List:
                     if (OnList != null)
                         output += OnList(currentList);
                     break;
 
-                case MarkdownParserType.keyvalue:
+                case MarkdownParserType.Keyvalue:
                     if (OnKeyValue != null)
                         output += OnKeyValue(currentKeyValue);
                     break;
 
-                case MarkdownParserType.paragraph:
+                case MarkdownParserType.Paragraph:
 
-                    var typeParagraph = MarkdownParagraphType.gt;
+                    var typeParagraph = MarkdownParagraphType.Gt;
 
                     switch (command)
                     {
                         case "//":
-                            typeParagraph = MarkdownParagraphType.comment;
+                            typeParagraph = MarkdownParagraphType.Comment;
                             break;
                         case "|":
-                            typeParagraph = MarkdownParagraphType.line;
+                            typeParagraph = MarkdownParagraphType.Line;
                             break;
                         case "/":
-                            typeParagraph = MarkdownParagraphType.slash;
+                            typeParagraph = MarkdownParagraphType.Slash;
                             break;
                     }
 
@@ -4712,7 +4693,7 @@ namespace Library
                     break;
             }
 
-            status = MarkdownParserType.empty;
+            status = MarkdownParserType.Empty;
             current.Clear();
             currentKeyValue.Clear();
             currentList.Clear();
@@ -4721,34 +4702,34 @@ namespace Library
 
         private bool ParseEmbedded(string line)
         {
-            var chars = Embedded + (status != MarkdownParserType.embedded ? " " : "");
+            var chars = Embedded + (status != MarkdownParserType.Embedded ? " " : "");
 
             if (chars.Length > line.Length)
                 return false;
 
             var has = line.Substring(0, chars.Length) == chars;
 
-            if (status != MarkdownParserType.embedded && !has)
+            if (status != MarkdownParserType.Embedded && !has)
                 return false;
 
-            if (status != MarkdownParserType.embedded && has)
+            if (status != MarkdownParserType.Embedded && has)
                 Flush();
 
-            if (status == MarkdownParserType.embedded && has)
+            if (status == MarkdownParserType.Embedded && has)
             {
                 Flush();
-                status = MarkdownParserType.empty;
+                status = MarkdownParserType.Empty;
                 return true;
             }
 
             if (has)
             {
-                status = MarkdownParserType.embedded;
+                status = MarkdownParserType.Embedded;
                 command = line.Substring(chars.Length);
                 return true;
             }
 
-            if (status == MarkdownParserType.embedded)
+            if (status == MarkdownParserType.Embedded)
                 current.Add(line);
 
             return true;
@@ -4759,19 +4740,19 @@ namespace Library
             if (!(line == "" || line == "***" || line == "---"))
                 return false;
 
-            if (status != MarkdownParserType.empty)
+            if (status != MarkdownParserType.Empty)
                 Flush();
 
-            status = MarkdownParserType.empty;
-            MarkdownBreakType type = MarkdownBreakType.newline;
+            status = MarkdownParserType.Empty;
+            MarkdownBreakType type = MarkdownBreakType.Newline;
 
             switch (line)
             {
                 case "***":
-                    type = MarkdownBreakType.pagebreak;
+                    type = MarkdownBreakType.Pagebreak;
                     break;
                 case "---":
-                    type = MarkdownBreakType.line;
+                    type = MarkdownBreakType.Line;
                     break;
             }
 
@@ -4790,24 +4771,24 @@ namespace Library
             if (!has)
                 return false;
 
-            if (status != MarkdownParserType.list)
+            if (status != MarkdownParserType.List)
             {
                 Flush();
-                status = MarkdownParserType.list;
+                status = MarkdownParserType.List;
             }
 
             if (currentList == null)
                 currentList = new List<MarkdownList>(5);
 
-            MarkdownListType type = MarkdownListType.x;
+            MarkdownListType type = MarkdownListType.X;
 
             switch (first)
             {
                 case '-':
-                    type = MarkdownListType.minus;
+                    type = MarkdownListType.Minus;
                     break;
                 case '+':
-                    type = MarkdownListType.plus;
+                    type = MarkdownListType.Plus;
                     break;
             }
 
@@ -4849,29 +4830,29 @@ namespace Library
             if (!has)
                 return false;
 
-            if (status != MarkdownParserType.empty)
+            if (status != MarkdownParserType.Empty)
                 Flush();
 
-            var typeTitle = MarkdownTitleType.h1;
+            var typeTitle = MarkdownTitleType.H1;
             switch (type)
             {
                 case "#":
-                    typeTitle = MarkdownTitleType.h1;
+                    typeTitle = MarkdownTitleType.H1;
                     break;
                 case "##":
-                    typeTitle = MarkdownTitleType.h2;
+                    typeTitle = MarkdownTitleType.H2;
                     break;
                 case "###":
-                    typeTitle = MarkdownTitleType.h3;
+                    typeTitle = MarkdownTitleType.H3;
                     break;
                 case "####":
-                    typeTitle = MarkdownTitleType.h4;
+                    typeTitle = MarkdownTitleType.H4;
                     break;
                 case "#####":
-                    typeTitle = MarkdownTitleType.h5;
+                    typeTitle = MarkdownTitleType.H5;
                     break;
                 case "######":
-                    typeTitle = MarkdownTitleType.h6;
+                    typeTitle = MarkdownTitleType.H6;
                     break;
             }
 
@@ -4915,10 +4896,10 @@ namespace Library
             if (countSpace < 3 && countTab <= 0)
                 return false;
 
-            if (status != MarkdownParserType.keyvalue)
+            if (status != MarkdownParserType.Keyvalue)
             {
                 Flush();
-                status = MarkdownParserType.keyvalue;
+                status = MarkdownParserType.Keyvalue;
             }
 
             if (currentKeyValue == null)
@@ -4953,15 +4934,15 @@ namespace Library
             if (has)
             {
                 var tmp = first + (first == '/' ? "/" : "");
-                if (command != "" && command != tmp && status == MarkdownParserType.paragraph)
+                if (command != "" && command != tmp && status == MarkdownParserType.Paragraph)
                     Flush();
                 command = tmp;
             }
 
-            if (status != MarkdownParserType.paragraph)
+            if (status != MarkdownParserType.Paragraph)
             {
                 Flush();
-                status = MarkdownParserType.paragraph;
+                status = MarkdownParserType.Paragraph;
             }
 
             current.Add(ParseOther(line.Substring(index + 1).Trim()));
@@ -4988,7 +4969,7 @@ namespace Library
             return line;
         }
 
-        private string GetReplace(string find, string replace)
+        private string GetReplace(string replace)
         {
             var key = REPLACE_ID + format.Count + ';';
             format.Add(new KeyValue(key, replace));
@@ -5003,7 +4984,7 @@ namespace Library
             {
                 var o = m.Value;
                 var url = o.Substring(1, o.Length - 2);
-                output = output.Replace(o, GetReplace(o, OnLink(url, url)));
+                output = output.Replace(o, GetReplace(OnLink(url, url)));
             }
 
             foreach (Match m in reg_link_2.Matches(output))
@@ -5012,7 +4993,7 @@ namespace Library
 
                 // Picture
                 // Skip
-                if (o.StartsWith("[!["))
+                if (o.StartsWith("[![", StringComparison.InvariantCultureIgnoreCase))
                     continue;
 
                 var index = o.IndexOf(']');
@@ -5040,10 +5021,10 @@ namespace Library
                 else
                     last = "";
 
-                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                if (!(url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase)))
                     url = "http://" + url;
 
-                output = output.Replace(o, GetReplace(o, (OnLink(ParseFormat(name, true), url)) + last));
+                output = output.Replace(o, GetReplace((OnLink(ParseFormat(name, true), url)) + last));
             }
 
             return output;
@@ -5056,10 +5037,10 @@ namespace Library
                 var o = m.Value.Trim();
                 var url = o;
 
-                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                if (!(url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase)))
                     url = "http://" + url;
 
-                text = text.Replace(o, GetReplace(o, OnLink(o, url)));
+                text = text.Replace(o, GetReplace(OnLink(o, url)));
             }
 
             foreach (Match m in reg_link_4.Matches(text))
@@ -5067,10 +5048,10 @@ namespace Library
                 var o = m.Value.Trim();
                 var url = o;
 
-                if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                if (!(url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase)))
                     url = "http://" + url;
 
-                text = text.Replace(o, GetReplace(o, OnLink(o, url)));
+                text = text.Replace(o, GetReplace(OnLink(o, url)));
             }
 
             return text;
@@ -5082,14 +5063,14 @@ namespace Library
             {
                 var o = m.Value.Trim();
                 var isAsterix = o[0] == '*';
-                var value = "";
+                string value;
 
                 if (isAsterix)
-                    value = OnFormat(o[1] == '*' ? MarkdownFormatType.em : MarkdownFormatType.i, reg_format_replace_asterix.Replace(o, ""));
+                    value = OnFormat(o[1] == '*' ? MarkdownFormatType.Em : MarkdownFormatType.I, reg_format_replace_asterix.Replace(o, ""));
                 else
-                    value = OnFormat(o[1] == '_' ? MarkdownFormatType.strong : MarkdownFormatType.b, reg_format_replace_underscore.Replace(o, ""));
+                    value = OnFormat(o[1] == '_' ? MarkdownFormatType.Strong : MarkdownFormatType.B, reg_format_replace_underscore.Replace(o, ""));
 
-                text = text.Replace(o, flush ? value : GetReplace(o, value));
+                text = text.Replace(o, flush ? value : GetReplace(value));
             }
 
             return text;
@@ -5102,7 +5083,7 @@ namespace Library
                 var o = m.Value.Trim();
                 var indexBeg = 2;
 
-                if (o.StartsWith("[!["))
+                if (o.StartsWith("[![", StringComparison.InvariantCultureIgnoreCase))
                     indexBeg = 3;
 
                 var index = o.IndexOf(']');
@@ -5125,7 +5106,7 @@ namespace Library
                 index = url.IndexOf('#');
                 indexBeg = index;
 
-                var src = "";
+                string src;
                 var indexEnd = index == -1 ? url.Length : url.IndexOf(')', index);
                 var width = 0;
                 var height = 0;
@@ -5148,7 +5129,7 @@ namespace Library
                 else
                     url = "";
 
-                text = text.Replace(find, GetReplace(find, OnImage(name, src, width, height, url)));
+                text = text.Replace(find, GetReplace(OnImage(name, src, width, height, url)));
             }
 
             return text;
@@ -5159,17 +5140,17 @@ namespace Library
             foreach (Match m in reg_keyword.Matches(text))
             {
                 var o = m.Value;
-                var type = MarkdownKeywordType.square;
+                var type = MarkdownKeywordType.Square;
 
                 if (o[0] == '{')
-                    type = MarkdownKeywordType.composite;
+                    type = MarkdownKeywordType.Composite;
 
-                if (type == MarkdownKeywordType.composite)
+                if (type == MarkdownKeywordType.Composite)
                     o = o.Replace(@"^\{{1}|(\}|]){1}$", "");
                 else
                     o = o.Replace(@"^\[{1}|(\]|]){1}$", "");
 
-                text = text.Replace(o, GetReplace(o, OnKeyword(type, o)));
+                text = text.Replace(o, GetReplace(OnKeyword(type, o)));
             }
 
             return text;
@@ -5289,7 +5270,7 @@ namespace Library
                 byte[] response = new byte[length];
 
                 int count = data_length > length ? data_length : length;
-                int index = 0;
+                int index;
 
                 for (int i = 0; i < count; i++)
                 {
@@ -5414,7 +5395,7 @@ namespace Library
             IsPrev = Current > 0;
             IsNext = Current < Count - 1;
 
-            this.Current++;
+            Current++;
         }
 
         public Pagination(int items, int page, int max)
@@ -5479,13 +5460,13 @@ namespace Library
             foreach (var k in Items.Where(key => key.Value.Expire <= d).ToList())
                 Remove(k.Key);
 
-            if (this.OnSchedule != null)
-                this.OnSchedule();
+            if (OnSchedule != null)
+                OnSchedule();
         }
 
         public bool SetExpire(string key, DateTime expire)
         {
-            File file = null;
+            File file;
 
             if (!Items.TryGetValue(key, out file))
                 return false;
@@ -5508,7 +5489,7 @@ namespace Library
 
         public void Remove(string id)
         {
-            File file = null;
+            File file;
 
             if (!Items.TryRemove(id, out file))
                 return;
@@ -5519,7 +5500,7 @@ namespace Library
 
         public File Read(string id)
         {
-            File file = null;
+            File file;
             if (Items.TryGetValue(id, out file))
                 return file;
             return null;
@@ -5566,7 +5547,7 @@ namespace Library
         public static void Add(string name, string url = "", int priority = -1)
         {
             var l = Items();
-            l.Add(new Page() { Name = name, Url = url.Empty(HttpContext.Current.Request.Url()), Priority = priority == -1 ? l.Count : priority });
+            l.Add(new Page { Name = name, Url = url.Empty(HttpContext.Current.Request.Url()), Priority = priority == -1 ? l.Count : priority });
         }
 
         public static void Add(Action<HashSet<Page>> onAppend)

@@ -31,9 +31,9 @@ namespace Library
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public class JsonAttribute : ValidationAttribute
     {
-        public override bool IsValid(object propertyValue)
+        public override bool IsValid(object value)
         {
-            var str = propertyValue as string;
+            var str = value as string;
             if (string.IsNullOrEmpty(str))
                 return true;
             return str.IsJson();
@@ -50,7 +50,7 @@ namespace Library
         public NumberAttribute(bool isDecimal = false)
             : base("The number is not valid.")
         {
-            this.IsDecimal = isDecimal;
+            IsDecimal = isDecimal;
         }
 
         public override bool IsValid(object value)
@@ -100,18 +100,18 @@ namespace Library
 
         public XhrAttribute()
         {
-            this.HostValid = true;
+            HostValid = true;
         }
 
         public XhrAttribute(bool hostValid)
         {
-            this.HostValid = hostValid;
+            HostValid = hostValid;
         }
 
         public XhrAttribute(bool hostValid, int httpStatus)
         {
-            this.HostValid = hostValid;
-            this.HttpStatus = httpStatus;
+            HostValid = hostValid;
+            HttpStatus = httpStatus;
         }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
@@ -147,15 +147,15 @@ namespace Library
 
         public HeaderAttribute(string name, string value)
         {
-            this.Name = name;
-            this.Value = value;
+            Name = name;
+            Value = value;
         }
 
         public HeaderAttribute(string name, string value, int httpStatus)
         {
-            this.Name = name;
-            this.Value = value;
-            this.HttpStatus = httpStatus;
+            Name = name;
+            Value = value;
+            HttpStatus = httpStatus;
         }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
@@ -163,8 +163,8 @@ namespace Library
             if (HttpStatus == 0)
                 HttpStatus = 403;
 
-            var value = filterContext.HttpContext.Request.Headers[this.Name];
-            if (value != this.Value)
+            var value = filterContext.HttpContext.Request.Headers[Name];
+            if (value != Value)
                 filterContext.Result = new HttpStatusCodeResult(HttpStatus);
 
             base.OnActionExecuting(filterContext);
@@ -195,17 +195,16 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class UnLoggedAttribute : ActionFilterAttribute
     {
-        private Authorization authorization = Authorization.unlogged;
-        public UnLoggedAttribute() { }
+        private Authorization authorization = Authorization.Unlogged;
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             if (Configuration.OnAuthorization == null)
                 return;
 
-            this.authorization = Configuration.OnAuthorization(filterContext.HttpContext, string.Empty, string.Empty);
+            authorization = Configuration.OnAuthorization(filterContext.HttpContext, string.Empty, string.Empty);
 
-            if (this.authorization != Authorization.unlogged)
+            if (authorization != Authorization.Unlogged)
             {
                 filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, authorization);
                 return;
@@ -220,9 +219,7 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class LoggedAttribute : AuthorizeAttribute
     {
-        private Authorization authorization = Authorization.unlogged;
-
-        public LoggedAttribute() { }
+        private Authorization authorization = Authorization.Unlogged;
 
         public string ErrorMessage { get; set; }
 
@@ -231,8 +228,8 @@ namespace Library
             if (Configuration.OnAuthorization == null)
                 return false;
 
-            authorization = Configuration.OnAuthorization(httpContext, this.Roles, this.Users);
-            return authorization == Authorization.logged;
+            authorization = Configuration.OnAuthorization(httpContext, Roles, Users);
+            return authorization == Authorization.Logged;
         }
 
         private void CacheValidateHandler(HttpContext context, object data, ref HttpValidationStatus validationStatus)
@@ -249,7 +246,7 @@ namespace Library
         {
             if (!AuthorizeCore(filterContext.HttpContext))
             {
-                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, this.authorization);
+                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, authorization);
                 return;
             }
 
@@ -264,10 +261,7 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class UserAttribute : AuthorizeAttribute
     {
-        private Authorization authorization = Authorization.unlogged;
-
-        public UserAttribute() { }
-
+        private Authorization authorization = Authorization.Unlogged;
         public string ErrorMessage { get; set; }
 
         protected override bool AuthorizeCore(HttpContextBase httpContext)
@@ -275,8 +269,8 @@ namespace Library
             if (Configuration.OnAuthorization == null)
                 return false;
 
-            authorization = Configuration.OnAuthorization(httpContext, this.Roles, this.Users);
-            return authorization == Authorization.logged;
+            authorization = Configuration.OnAuthorization(httpContext, Roles, Users);
+            return authorization == Authorization.Logged;
         }
 
         private void CacheValidateHandler(HttpContext context, object data, ref HttpValidationStatus validationStatus)
@@ -293,7 +287,7 @@ namespace Library
         {
             if (!AuthorizeCore(filterContext.HttpContext))
             {
-                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, this.authorization);
+                filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, authorization);
                 return;
             }
 
@@ -308,17 +302,16 @@ namespace Library
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public class AnonymAttribute : ActionFilterAttribute
     {
-        private Authorization authorization = Authorization.unlogged;
-        public AnonymAttribute() { }
+        private Authorization authorization = Authorization.Unlogged;
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             if (Configuration.OnAuthorization == null)
                 return;
 
-            this.authorization = Configuration.OnAuthorization(filterContext.HttpContext, string.Empty, string.Empty);
+            authorization = Configuration.OnAuthorization(filterContext.HttpContext, string.Empty, string.Empty);
 
-            if (this.authorization != Authorization.unlogged)
+            if (authorization != Authorization.Unlogged)
             {
                 filterContext.Result = Configuration.OnAuthorizationError(filterContext.RequestContext.HttpContext.Request, authorization);
                 return;
@@ -344,16 +337,16 @@ namespace Library
 
         public ProxyAttribute(string key, string method = "POST", int httpStatus = 434)
         {
-            this.Key = "Library." + key.Hash("sha256");
-            this.Method = "POST";
-            this.HttpStatus = httpStatus;
+            Key = "Library." + key.Hash("sha256");
+            Method = "POST";
+            HttpStatus = httpStatus;
         }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             var request = filterContext.HttpContext.Request;
 
-            if (request.HttpMethod != this.Method || request.Headers["X-Proxy"] != this.Key)
+            if (request.HttpMethod != Method || request.Headers["X-Proxy"] != Key)
                 filterContext.Result = new HttpStatusCodeResult(HttpStatus);
 
             base.OnActionExecuting(filterContext);
@@ -374,33 +367,32 @@ namespace Library
 
         public FormAttribute()
         {
-            this.HostValid = true;
-            this.HttpStatus = 403;
-            this.Json = true;
+            HostValid = true;
+            HttpStatus = 403;
+            Json = true;
         }
 
         public FormAttribute(Type type, string parameter = "model", bool hostValid = true, int httpStatus = 401, bool json = true)
         {
-            this.ParameterType = type;
-            this.Parameter = parameter;
-            this.HostValid = hostValid;
-            this.HttpStatus = httpStatus;
-            this.Json = json;
+            ParameterType = type;
+            Parameter = parameter;
+            HostValid = hostValid;
+            HttpStatus = httpStatus;
+            Json = json;
         }
 
         public FormAttribute(bool hostValid = true, int httpStatus = 401, bool json = true)
         {
-            this.HostValid = hostValid;
-            this.HttpStatus = httpStatus;
-            this.Json = json;
+            HostValid = hostValid;
+            HttpStatus = httpStatus;
+            Json = json;
         }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {
             var request = filterContext.HttpContext.Request;
 
-            if (request.IsAjaxRequest() == false)
-            {
+            if (!request.IsAjaxRequest()) {
                 filterContext.Result = new HttpStatusCodeResult(HttpStatus);
                 base.OnActionExecuting(filterContext);
                 return;
@@ -419,7 +411,7 @@ namespace Library
 
             if (Json)
             {
-                if (request.ContentType.StartsWith("application/json") == false)
+                if (request.ContentType.StartsWith("application/json", StringComparison.InvariantCultureIgnoreCase) == false)
                 {
                     filterContext.Result = new HttpStatusCodeResult(HttpStatus);
                     base.OnActionExecuting(filterContext);
@@ -428,7 +420,7 @@ namespace Library
 
                 if (!string.IsNullOrEmpty(Parameter))
                 {
-                    string inputContent = "";
+                    string inputContent;
                     using (var sr = new StreamReader(filterContext.HttpContext.Request.InputStream))
                         inputContent = sr.ReadToEnd();
 
@@ -457,7 +449,7 @@ namespace Library
         void IActionFilter.OnActionExecuting(ActionExecutingContext filterContext)
         {
             Configuration.Analytics.Request(filterContext.HttpContext, AllowXhr);
-            this.OnActionExecuting(filterContext);
+            OnActionExecuting(filterContext);
         }
     }
     #endregion
@@ -466,8 +458,6 @@ namespace Library
     public class StopwatchAttribute : ActionFilterAttribute, IResultFilter
     {
         private DateTime start;
-
-        public StopwatchAttribute() { }
 
         public override void OnActionExecuting(ActionExecutingContext filterContext)
         {

@@ -203,20 +203,15 @@ namespace Library.Modules
                 {
                     put(theA);
                     put(theB);
-                    for (; ; )
-                    {
+                    while (true) {
                         theA = get();
                         if (theA == '/')
-                        {
                             break;
-                        }
-                        else if (theA == '\\')
-                        {
+
+                        if (theA == '\\') {
                             put(theA);
                             theA = get();
-                        }
-                        else if (theA <= '\n')
-                        {
+                        } else if (theA <= '\n') {
                             throw new Exception(string.Format("Error: JSMIN unterminated Regular Expression literal : {0}.\n", theA));
                         }
                         put(theA);
@@ -374,9 +369,7 @@ namespace Library.Modules
                 var end = less.Value.IndexOf(')', beg + 1);
 
                 foreach (var p in less.Value.Substring(beg, end - beg).Split(','))
-                {
-                    param.Add(new LessParam() { Name = p.Trim() });
-                }
+                    param.Add(new LessParam { Name = p.Trim() });
 
                 beg = Value.IndexOf('(') + 1;
                 end = Value.LastIndexOf(')');
@@ -596,7 +589,7 @@ namespace Library.Modules
 
                 foreach (var m in l.Where(n => !n.IsVariable && !n.IsProblem))
                 {
-                    var value = m.GetValue(variables.Where(n => n.Name == m.Name).FirstOrDefault());
+                    var value = m.GetValue(variables.FirstOrDefault(n => n.Name == m.Name));
                     css = css.Replace(m.Value, value);
                 }
             }
@@ -615,7 +608,7 @@ namespace Library.Modules
                 }
             }
 
-            var reg1 = new Regex(@"\n|\s{2,}", System.Text.RegularExpressions.RegexOptions.Compiled);
+            var reg1 = new Regex(@"\n|\s{2,}", RegexOptions.Compiled);
             var reg2 = new Regex(@"\s?\{\s{1,}");
             var reg3 = new Regex(@"\s?\}\s{1,}");
             var reg4 = new Regex(@"\s?\:\s{1,}");
@@ -632,7 +625,7 @@ namespace Library.Modules
             while (index != -1)
             {
 
-                index = value.IndexOf("@keyframes", index + 1);
+                index = value.IndexOf("@keyframes", index + 1, StringComparison.InvariantCultureIgnoreCase);
                 if (index == -1)
                     continue;
 
@@ -656,7 +649,7 @@ namespace Library.Modules
 
                     end = indexer;
                     break;
-                };
+                }
 
                 if (end == -1)
                     continue;
@@ -667,9 +660,8 @@ namespace Library.Modules
 
             for (var i = 0; i < builder.Count; i++)
             {
-                var name = builder[i].Key;
                 var property = builder[i].Value;
-                var plus = property.Substring(1); ;
+                var plus = property.Substring(1);
                 var delimiter = "\n";
                 var updated = plus + delimiter;
 
@@ -678,7 +670,7 @@ namespace Library.Modules
                 updated += "@-o-" + plus;
                 value = value.Replace(property, "[[{0}]]".format(output.Count));
                 output.Add(updated);
-            };
+            }
 
             index = 0;
             foreach (var m in output)
@@ -689,13 +681,13 @@ namespace Library.Modules
 
         private static string Autoprefixer(string value)
         {
-            var prefix = new string[] { "appearance", "border-image", "column-count", "column-gap", "column-rule", "display", "transform", "transform-origin", "transition", "user-select", "animation", "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-iteration-count", "animation-direction", "animation-play-state", "opacity", "background", "background-image" };
+            var prefix = new [] { "appearance", "border-image", "column-count", "column-gap", "column-rule", "display", "transform", "transform-origin", "transition", "user-select", "animation", "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-iteration-count", "animation-direction", "animation-play-state", "opacity", "background", "background-image" };
             var id = "@#auto-vendor-prefix#@";
 
-            if (value.IndexOf(id) == -1)
+            if (value.IndexOf(id, StringComparison.InvariantCultureIgnoreCase) == -1)
             {
                 id = "/*auto*/";
-                if (value.IndexOf(id) == -1)
+                if (value.IndexOf(id, StringComparison.InvariantCultureIgnoreCase) == -1)
                     return value;
             }
 
@@ -714,7 +706,7 @@ namespace Library.Modules
                 while (index != -1)
                 {
 
-                    index = value.IndexOf(property, index + 1);
+                    index = value.IndexOf(property, index + 1, StringComparison.InvariantCultureIgnoreCase);
 
                     if (index == -1)
                         continue;
@@ -783,7 +775,7 @@ namespace Library.Modules
                 if (name == "background" || name == "background-image")
                 {
 
-                    if (property.IndexOf("linear-gradient") == -1)
+                    if (property.IndexOf("linear-gradient", StringComparison.InvariantCultureIgnoreCase) == -1)
                         continue;
 
                     updated = plus.Replace("linear-", "-webkit-linear-") + delimiter;
@@ -800,7 +792,7 @@ namespace Library.Modules
                 if (name == "display")
                 {
 
-                    if (property.IndexOf("box") == -1)
+                    if (property.IndexOf("box", StringComparison.InvariantCultureIgnoreCase) == -1)
                         continue;
 
                     updated = plus + delimiter;
@@ -814,14 +806,14 @@ namespace Library.Modules
                 updated += "-webkit-" + plus + delimiter;
                 updated += "-moz-" + plus;
 
-                if (name.IndexOf("animation") == -1)
+                if (name.IndexOf("animation", StringComparison.InvariantCultureIgnoreCase) == -1)
                     updated += delimiter + "-ms-" + plus;
 
                 updated += delimiter + "-o-" + plus;
 
                 value = value.Replace(property, "[[{0}]]".format(output.Count));
                 output.Add(updated + last);
-            };
+            }
 
             index = 0;
             foreach (var m in output)

@@ -196,10 +196,10 @@ namespace System.Web.Mvc
         public static HtmlString If(this HtmlHelper htmlHelper, bool condition, object ifTrue, object ifFalse = null)
         {
             var value = condition ? ifTrue as string : ifFalse as string;
-            return new HtmlString(value == null ? "" : value);
+            return new HtmlString(value ?? "");
         }
 
-        public static MvcHtmlString CheckBoxClassicFor<TModel, TProperty>(this HtmlHelper<TModel> htmlHelper, System.Linq.Expressions.Expression<Func<TModel, TProperty>> expression, object htmlAttributes = null)
+        public static MvcHtmlString CheckBoxClassicFor<TModel, TProperty>(this HtmlHelper<TModel> htmlHelper, Expression<Func<TModel, TProperty>> expression, object htmlAttributes = null)
         {
             var member = (expression.Body as MemberExpression);
             if (member == null)
@@ -213,7 +213,7 @@ namespace System.Web.Mvc
                     throw new InvalidCastException();
             }
 
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("<input type=\"checkbox\"");
 
             var name = member.Member.Name;
@@ -249,7 +249,7 @@ namespace System.Web.Mvc
 
         public static HtmlString Options<T>(this HtmlHelper htmlHelper, IList<T> list, string text = "Key", string value = "Value", object selected = null)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
 
             var sel = "";
 
@@ -284,7 +284,7 @@ namespace System.Web.Mvc
 
         public static HtmlString InputText(this HtmlHelper htmlHelper, string name, string className = "", int maxLength = 50, bool required = false, bool disabled = false, bool autocomplete = true)
         {
-            return Input(htmlHelper, "text", name, className, maxLength, required, disabled);
+            return Input(htmlHelper, "text", name, className, maxLength, required, disabled, autocomplete);
         }
 
         public static HtmlString InputPassword(this HtmlHelper htmlHelper, string name, string className = "", int maxLength = 50, bool required = false, bool disabled = false, bool autocomplete = true)
@@ -299,7 +299,7 @@ namespace System.Web.Mvc
 
         public static HtmlString Input(this HtmlHelper htmlHelper, string type, string name, string className = "", int maxLength = 0, bool required = false, bool disabled = false, bool autocomplete = true, string label = "")
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             var format = string.IsNullOrEmpty(label) ? "{0} />" : string.Format("<label>{0} /><span>{1}</span></label>", "{0}", label);
 
             sb.Append("<input");
@@ -326,12 +326,12 @@ namespace System.Web.Mvc
             var model = htmlHelper.ViewData.Model;
 
             if (model == null)
-                return new HtmlString(string.Format(format, sb.ToString()));
+                return new HtmlString(string.Format(format, sb));
 
             var property = model.GetType().GetProperty(name);
 
             if (property == null)
-                return new HtmlString(string.Format(format, sb.ToString()));
+                return new HtmlString(string.Format(format, sb));
 
             var value = property.GetValue(model, null);
             var isChecked = false;
@@ -347,12 +347,12 @@ namespace System.Web.Mvc
             if (isChecked)
                 sb.AppendAttribute("checked", "checked");
 
-            return new HtmlString(string.Format(format, sb.ToString()));
+            return new HtmlString(string.Format(format, sb));
         }
 
         public static HtmlString Textarea(this HtmlHelper htmlHelper, string name, string className = "", bool required = false, bool disabled = false, int maxLength = 0, bool wrap = true)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             var format = "{0}>{1}</textarea>";
 
             sb.Append("<textarea");
@@ -378,20 +378,20 @@ namespace System.Web.Mvc
             var model = htmlHelper.ViewData.Model;
 
             if (model == null)
-                return new HtmlString(string.Format(format, sb.ToString(), ""));
+                return new HtmlString(string.Format(format, sb, ""));
 
             var property = model.GetType().GetProperty(name);
 
             if (property == null)
-                return new HtmlString(string.Format(format, sb.ToString(), ""));
+                return new HtmlString(string.Format(format, sb, ""));
 
             var value = property.GetValue(model, null);
-            return new HtmlString(string.Format(format, sb.ToString(), value == null ? "" : value.ToString().HtmlEncode()));
+            return new HtmlString(string.Format(format, sb, value == null ? "" : value.ToString().HtmlEncode()));
         }
 
         public static MvcHtmlString CheckBoxClassic(this HtmlHelper htmlHelper, string name, bool isChecked, object htmlAttributes = null)
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("<input type=\"checkbox\"");
 
             var id = false;
@@ -436,13 +436,13 @@ namespace System.Web.Mvc
         public static HtmlString JsCompress<TModel>(this HtmlHelper<TModel> htmlHelper, Func<WebViewPage<TModel>, object> content, bool compress = true)
         {
             var value = content((WebViewPage<TModel>)htmlHelper.ViewDataContainer).ToString();
-            return new HtmlString(compress ? value.JsCompress(System.Text.Encoding.UTF8) : value);
+            return new HtmlString(compress ? value.JsCompress(Encoding.UTF8) : value);
         }
 
         public static HtmlString CssCompress<TModel>(this HtmlHelper<TModel> htmlHelper, Func<WebViewPage<TModel>, object> content, bool compress = true)
         {
             var value = content((WebViewPage<TModel>)htmlHelper.ViewDataContainer).ToString();
-            return new HtmlString(compress ? value.CssCompress(System.Text.Encoding.UTF8) : value);
+            return new HtmlString(compress ? value.CssCompress() : value);
         }
 
         public static HtmlString Template(this HtmlHelper source, string id, string content)
@@ -512,7 +512,7 @@ namespace System.Web.Mvc
 
         public static HtmlString Image(this HtmlHelper source, string url, int width = 0, int height = 0, string alt = "", string cls = "")
         {
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
 
             sb.Append("<img");
 
@@ -544,7 +544,7 @@ namespace System.Web.Mvc
             var format = "<link rel=\"icon\" href=\"{0}\" type=\"image/{1}\" /><link rel=\"shortcut icon\" href=\"{0}\" type=\"image/{1}\" />";
             var type = "x-icon";
 
-            if (url.LastIndexOf(".png") != -1)
+            if (url.LastIndexOf(".png", StringComparison.InvariantCultureIgnoreCase) != -1)
                 type = "png";
 
             if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
@@ -600,13 +600,12 @@ namespace System.Web.Mvc
         public static void Ng(this HtmlHelper source, string version, params string[] name)
         {
             if (name == null && name.Length == 0)
-                name = new string[1] { "angular" };
+                name = new [] { "angular" };
 
-            foreach (var m in name)
-            {
+            foreach (var m in name) {
                 var filename = m.ToLower();
 
-                if (filename != "angular" && filename.IndexOf("angular") == -1)
+                if (filename != "angular" && filename.IndexOf("angular", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename = "angular-" + filename;
 
                 Head(source, "//ajax.googleapis.com/ajax/libs/angularjs/" + version + '/' + filename + ".min.js");
@@ -621,7 +620,7 @@ namespace System.Web.Mvc
             foreach (var m in name)
             {
                 var filename = m;
-                if (filename.LastIndexOf(".js") == -1)
+                if (filename.LastIndexOf(".js", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename += ".js";
 
                 Head(source, "/app/controllers/" + filename);
@@ -636,7 +635,7 @@ namespace System.Web.Mvc
             foreach (var m in name)
             {
                 var filename = m;
-                if (filename.LastIndexOf(".js") == -1)
+                if (filename.LastIndexOf(".js", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename += ".js";
 
                 Head(source, "/app/directives/" + filename);
@@ -651,7 +650,7 @@ namespace System.Web.Mvc
             foreach (var m in name)
             {
                 var filename = m;
-                if (filename.LastIndexOf(".js") == -1)
+                if (filename.LastIndexOf(".js", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename += ".js";
 
                 Head(source, "/app/services/" + filename);
@@ -666,7 +665,7 @@ namespace System.Web.Mvc
             foreach (var m in name)
             {
                 var filename = m;
-                if (filename.LastIndexOf(".js") == -1)
+                if (filename.LastIndexOf(".js", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename += ".js";
 
                 Head(source, "/app/filters/" + filename);
@@ -681,7 +680,7 @@ namespace System.Web.Mvc
             foreach (var m in name)
             {
                 var filename = m;
-                if (filename.LastIndexOf(".js") == -1)
+                if (filename.LastIndexOf(".js", StringComparison.InvariantCultureIgnoreCase) == -1)
                     filename += ".js";
 
                 Head(source, "/app/resources/" + filename);
