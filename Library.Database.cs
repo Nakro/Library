@@ -1275,7 +1275,7 @@ namespace Library
             if (string.IsNullOrEmpty(p))
                 throw new Exception("Primary key is not implemented.");
 
-            return Reader(string.Format("SELECT TOP 1 {0} FROM {1} WHERE {2}=@Id", sb, GetTableNameSelect, p), new { Id = primaryKey }).FirstOrDefault();
+            return Reader(string.Format("SELECT TOP 1 {0} FROM {1} WHERE {2}=@Id", sb, GetTableNameSelect, p), new { Id = primaryKey }, true).FirstOrDefault();
         }
 
         public IEnumerable<T> GetAll(params OrderBy[] orderBy)

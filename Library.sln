@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-VisualStudioVersion = 12.0.30110.0
-MinimumVisualStudioVersion = 10.0.40219.1
+VisualStudioVersion = {0}
+MinimumVisualStudioVersion = {0}
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Library", "Library.csproj", "{DE6966D1-2376-48CC-84DB-94B5147E5E58}"
 EndProject
-Project("{9344BDBB-3E7F-41FC-A0DD-8665D75EE146}") = "Testovanie", "..\Testovanie\Testovanie.csproj", "{062C45B5-128C-4828-98AA-19C93FFC6C14}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Testovanie", "..\Testovanie\Testovanie.csproj", "{062C45B5-128C-4828-98AA-19C93FFC6C14}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

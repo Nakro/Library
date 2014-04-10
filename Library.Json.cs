@@ -318,24 +318,28 @@ namespace Library.Json
                 WriteNull(sb, divider, name);
                 return;
             }
-
+                          
             var pt = o.GetType();
+            var isEnum = pt.IsEnum;
+
+            if (isEnum)
+                pt = pt.GetEnumUnderlyingType();
 
             if (pt == ConfigurationCache.type_int || pt == ConfigurationCache.type_byte || pt == ConfigurationCache.type_decimal || pt == ConfigurationCache.type_short || pt == ConfigurationCache.type_long || pt == ConfigurationCache.type_float || pt == ConfigurationCache.type_double)
             {
-                WriteNumber(sb, divider, name, o);
+                WriteNumber(sb, divider, name, isEnum ? Convert.ChangeType(o, pt) : o);
                 return;
             }
 
             if (pt == ConfigurationCache.type_string)
             {
-                WriteString(sb, divider, name, o);
+                WriteString(sb, divider, name, isEnum ? Convert.ChangeType(o, pt) : o);
                 return;
             }
 
             if (pt == ConfigurationCache.type_bool)
             {
-                WriteBool(sb, divider, name, o);
+                WriteBool(sb, divider, name, isEnum ? Convert.ChangeType(o, pt) : o);
                 return;
             }
 

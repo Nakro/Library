@@ -25,6 +25,7 @@
 - added: uploaded File.IsVideo()
 - added: DbSchema(schema = "")
 - added: string.SqlEscape()
+- added: JSON supports enum
 
 - updated: ImageConverter (supports stream)
 - updated: MarkDown parser
