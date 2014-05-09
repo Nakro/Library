@@ -1248,7 +1248,7 @@ namespace Library.Json
         private string ConverDateTimeToString(DateTime d)
         {
             var uni = d.ToUniversalTime();
-            return string.Format("{0}T{1}Z", uni.ToString("yyyy-MM-dd"), uni.ToString("HH:mm:ss.ms"));
+            return string.Format("{0}T{1}Z", uni.ToString("yyyy-MM-dd"), uni.ToString("HH:mm:ss.fff"));
         }
 
         private string ToSafeString(string s)

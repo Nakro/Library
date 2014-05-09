@@ -1,0 +1,5 @@
+/Volumes/Development/github/Library/obj/Release/.NETFramework,Version=v4.0.AssemblyAttribute.cs
+/Volumes/Development/github/Library/bin/Release/Library.dll.mdb
+/Volumes/Development/github/Library/bin/Release/Library.dll
+/Volumes/Development/github/Library/obj/Release/Library.dll
+/Volumes/Development/github/Library/obj/Release/Library.dll.mdb
