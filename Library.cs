@@ -2770,6 +2770,20 @@ namespace Library
             return source.Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"").Replace("&#39;", "'");
         }
 
+        public static string Url(this string source)
+        {
+            if (source.IsEmpty())
+                return source;
+
+            if (source.StartsWith("http://"))
+                return source;
+
+            if (source.StartsWith("https://"))
+                return source;
+                
+            return "http://" + source;
+        }
+
         public static StringBuilder AppendConfiguration(this StringBuilder source, string name, object value, int padding = 15)
         {
             if (source.Length > 0 && source[source.Length - 1] != '\n')
