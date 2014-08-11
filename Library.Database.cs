@@ -20,10 +20,14 @@ namespace Library
     #region Enums
     public enum ReaderCursor
     {
-        Continue,       // pokračuje
-        Skip,           // preskočí
-        Break,          // ukončí while
-        Close           // ukončí while aj pri nextResult
+        Continue,
+        // pokračuje
+        Skip,
+        // preskočí
+        Break,
+        // ukončí while
+        Close
+        // ukončí while aj pri nextResult
     }
 
     public enum OrderByType : byte
@@ -39,110 +43,158 @@ namespace Library
         string TableName { get; set; }
 
         ISql<T> Use(Action<ISql<T>> declaration);
+
         IDatabase DB { get; }
 
         IList<string> Columns { get; }
+
         string PrimaryKey { get; }
 
         bool AutoLocking { get; set; }
 
         int Execute(string sql);
+
         int Execute(string sql, object arg);
 
         object Scalar(string sql);
+
         object Scalar(string sql, object arg);
+
         object Scalar(string columnName, SqlBuilder builder);
 
         IEnumerable<T> Reader(string sql, bool singleRow = false, int skip = 0, int tak = 0);
+
         IEnumerable<T> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int tak = 0);
 
         IEnumerable<T> GetAll(params OrderBy[] orderBy);
+
         IEnumerable<T> GetAll(string[] disabledPropertyName, params OrderBy[] orderBy);
+
         IEnumerable<T> GetAll(int top, params OrderBy[] orderBy);
+
         IEnumerable<T> GetAll(int top, string[] disabledPropertyName, params OrderBy[] orderBy);
+
         IEnumerable<T> GetAll(int skip, int take, params OrderBy[] orderBy);
+
         IEnumerable<T> GetAll(int skip, int take, string[] disabledPropertyName, params OrderBy[] orderBy);
 
         IEnumerable<T> FindAll(SqlBuilder builder, params OrderBy[] orderBy);
+
         IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, params OrderBy[] orderBy);
+
         IEnumerable<T> FindAll(SqlBuilder builder, string[] disabledPropertyName, params OrderBy[] orderBy);
+
         IEnumerable<T> FindAll(SqlBuilder builder, int skip, int take, string[] disabledPropertyName, params OrderBy[] orderBy);
 
         IEnumerable<T> FindTop(int top, SqlBuilder builder, params OrderBy[] orderBy);
+
         IEnumerable<T> FindTop(int top, SqlBuilder builder, string[] disabledPropertyName, params OrderBy[] orderBy);
 
         T FindByPK(object primaryKey, params string[] disabledPropertyName);
+
         T FindOne(SqlBuilder builder, params OrderBy[] orderBy);
+
         T FindOne(SqlBuilder builder, string[] disabledPropertyName, params OrderBy[] orderBy);
 
         int Count();
+
         int Count(SqlBuilder builder);
 
         bool Exists();
+
         bool Exists(SqlBuilder builder);
 
         object Insert(object arg, params string[] disabledPropertyName);
 
         int Update(string where, object arg, params string[] disabledPropertyName);
+
         int Update(string where, object arg, object whereArg, params string[] disabledPropertyName);
+
         int Update(SqlBuilder builder, object arg, params string[] disabledPropertyName);
 
         int UpdateOnly(string where, object arg, params string[] propertyName);
+
         int UpdateOnly(string where, object arg, object whereArg, params string[] propertyName);
+
         int UpdateOnly(SqlBuilder builder, object arg, params string[] propertyName);
 
         bool Save(object arg);
 
         int Delete(object arg);
+
         int Delete(SqlBuilder builder);
+
         int Delete(string where, object arg);
     }
 
     public interface ISqlUnknown
     {
         IDatabase DB { get; }
+
         int Execute(string sql);
+
         int Execute(string sql, object arg);
+
         object Scalar(string sql);
+
         object Scalar(string sql, object arg);
+
         IEnumerable<dynamic> Reader(string sql, bool singleRow = false, int skip = 0, int take = 0);
+
         IEnumerable<dynamic> Reader(string sql, object arg, bool singleRow = false, int skip = 0, int take = 0);
+
         bool ReaderBinary(string sql, object arg, Action<byte[]> onReadBinary);
+
         bool ReaderBinary(string sql, Action<byte[]> onReadBinary);
+
         void ReaderMultiple(string sql, object arg, Func<int, dynamic, ReaderCursor> onRead);
+
         void ReaderMultiple(string sql, Func<int, dynamic, ReaderCursor> onRead);
     }
 
     public interface IConnection<T> where T : class, IDisposable
     {
         T Instance { get; }
+
         bool IsOpened { get; }
+
         void Open(string connString);
+
         void Open(string connString, IsolationLevel? isoLevel);
+
         void Close();
     }
 
     public interface ICommand
     {
         bool Prepare { get; set; }
+
         int Execute(string sql, IList<Parameter> parameters);
+
         object Scalar(string sql, IList<Parameter> parameters);
+
         IEnumerable<T> ReaderEnumerator<T>(string sql, IList<Parameter> parameters, Func<string, DatabaseColumnMap> onColumnMap, bool singleRow = false);
+
         IEnumerable<dynamic> ReaderEnumerator(string sql, IList<Parameter> parameters, bool singleRow = false);
+
         bool ReaderBinary(string sql, IList<Parameter> parameters, Action<byte[]> onReadBinary);
+
         void ReaderMultiple(string sql, IList<Parameter> parameters, Func<int, dynamic, ReaderCursor> onRead);
     }
 
     public interface ITransaction
     {
         void TransactionBegin(IsolationLevel isoLevel);
+
         void TransactionRollback();
+
         void TransactionCommit();
     }
 
-    public interface IDatabase : ICommand, ITransaction
+    public interface IDatabase : ICommand, ITransaction, IDisposable
     {
         int Version { get; }
+        bool IsOleDB { get; }
     }
     #endregion
 
@@ -170,7 +222,9 @@ namespace Library
         }
 
         public string Name { get; set; }
+
         public string Format { get; set; }
+
         public string Raw { get; set; }
 
         public byte Precision
@@ -212,7 +266,8 @@ namespace Library
         public bool PrimaryKey { get; set; }
 
         public DbParameterAttribute()
-        { }
+        {
+        }
 
         public DbParameterAttribute(int size)
         {
@@ -259,6 +314,7 @@ namespace Library
     public class DbTableAttribute : Attribute
     {
         public string Name { get; set; }
+
         public string Schema { get; set; }
 
         public DbTableAttribute(string name)
@@ -285,10 +341,16 @@ namespace Library
     }
 
     [AttributeUsage(AttributeTargets.Property)]
-    public class NoDbParameterAttribute : Attribute { }
+    public class NoDbParameterAttribute : Attribute
+    {
+
+    }
 
     [AttributeUsage(AttributeTargets.Property)]
-    public class DbSkipAttribute : Attribute { }
+    public class DbSkipAttribute : Attribute
+    {
+
+    }
     #endregion
 
     #region SqlBuilder
@@ -437,6 +499,7 @@ namespace Library
     public class OrderBy
     {
         public string Name { get; set; }
+
         public OrderByType Order { get; set; }
 
         public static OrderBy Asc(string columnName)
@@ -470,7 +533,9 @@ namespace Library
     public class DatabaseColumnMap
     {
         public string DbName { get; set; }
+
         public string Name { get; set; }
+
         public bool Json { get; set; }
 
         public DatabaseColumnMap(string dbName, string name, bool json = false)
@@ -484,14 +549,21 @@ namespace Library
     public class DatabaseColumns
     {
         public StringBuilder Clean { get; set; }
+
         public StringBuilder Raw { get; set; }
+
         public string OrderBy { get; set; }
     }
 
     public class Database : IConnection<Database>, IDatabase, IDisposable
     {
         private const int BUFFER_SIZE = 1024;
+
         public bool IsOpened { get; private set; }
+        public bool IsOleDB
+        {
+            get { return false; }
+        }
 
         public int Version
         {
@@ -584,8 +656,7 @@ namespace Library
                     TransactionBegin(isoLevel.Value);
 
                 IsOpened = true;
-            }
-            catch (Exception Ex)
+            } catch (Exception Ex)
             {
                 _error(Ex);
             }
@@ -612,8 +683,7 @@ namespace Library
             try
             {
                 transaction.Rollback();
-            }
-            catch (Exception Ex)
+            } catch (Exception Ex)
             {
                 Instance._error(Ex);
             }
@@ -624,8 +694,7 @@ namespace Library
             try
             {
                 transaction.Commit();
-            }
-            catch (Exception Ex)
+            } catch (Exception Ex)
             {
                 Instance._error(Ex);
             }
@@ -639,8 +708,7 @@ namespace Library
             {
                 cmd.Dispose();
                 Instance.connection.Close();
-            }
-            catch (Exception Ex)
+            } catch (Exception Ex)
             {
                 Instance._error(Ex);
             }
@@ -666,13 +734,11 @@ namespace Library
 
                     if (_prepare)
                         cmd.Prepare();
-                }
-                else
+                } else
                     ParamToParam(cmd, parameters, true);
 
                 v = cmd.ExecuteNonQuery();
-            }
-            catch (Exception Ex)
+            } catch (Exception Ex)
             {
                 _error(Ex);
             }
@@ -694,13 +760,11 @@ namespace Library
 
                     if (_prepare)
                         cmd.Prepare();
-                }
-                else
+                } else
                     ParamToParam(cmd, parameters, true);
 
                 v = cmd.ExecuteScalar();
-            }
-            catch (Exception ex)
+            } catch (Exception ex)
             {
                 _error(ex);
                 v = null;
@@ -719,8 +783,7 @@ namespace Library
 
                 if (_prepare)
                     cmd.Prepare();
-            }
-            else
+            } else
                 ParamToParam(cmd, parameters, true);
 
             using (var reader = cmd.ExecuteReader(singleRow ? CommandBehavior.SingleRow : CommandBehavior.SingleResult))
@@ -762,8 +825,7 @@ namespace Library
 
                 if (_prepare)
                     cmd.Prepare();
-            }
-            else
+            } else
                 ParamToParam(cmd, parameters, true);
 
             using (var reader = cmd.ExecuteReader(CommandBehavior.Default))
@@ -830,8 +892,7 @@ namespace Library
 
                 if (_prepare)
                     cmd.Prepare();
-            }
-            else
+            } else
                 ParamToParam(cmd, parameters, true);
 
             using (var reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
@@ -876,8 +937,7 @@ namespace Library
 
                 if (_prepare)
                     cmd.Prepare();
-            }
-            else
+            } else
                 ParamToParam(cmd, parameters, true);
 
             using (var reader = cmd.ExecuteReader(singleRow ? CommandBehavior.SingleRow : CommandBehavior.SingleResult))
@@ -917,8 +977,7 @@ namespace Library
                         {
                             if (value != DBNull.Value)
                                 bindValue = Configuration.JsonProvider.DeserializeObject(value as string, typ);
-                        }
-                        else if (value != DBNull.Value)
+                        } else if (value != DBNull.Value)
                             bindValue = value;
 
                         typ.GetProperty(i.Name).SetValue(obj, bindValue, null);
@@ -939,10 +998,12 @@ namespace Library
             if (!updateValues)
             {
                 cmd.Parameters.Clear();
-                foreach (var p in parameters) {
+                foreach (var p in parameters)
+                {
                     var v = cmd.Parameters.Add(new SqlParameter(p.Name, p.Type, p.Size));
 
-                    if (p.Type == SqlDbType.Decimal) {
+                    if (p.Type == SqlDbType.Decimal)
+                    {
                         if (p.Precision > 0)
                             v.Precision = p.Precision;
 
@@ -950,7 +1011,8 @@ namespace Library
                             v.Scale = (byte)p.Size;
                     }
 
-                    if (p.Json) {
+                    if (p.Json)
+                    {
                         if (p.Type == SqlDbType.Variant)
                             p.Type = SqlDbType.VarChar;
 
@@ -997,7 +1059,7 @@ namespace Library
                         continue;
                     }
 
-                    v.Value = (p.Value == null ? DBNull.Value : p.Value);
+                    v.Value = (p.Value ?? DBNull.Value);
                     continue;
                 }
 
@@ -1012,8 +1074,7 @@ namespace Library
                 {
                     param.Value = p.Value;
                     SetupString(param, p.IsSizeDeclared);
-                }
-                else
+                } else
                 {
                     // TODO: neviem na čo to tu je
                     // param.Size = p.Size;
@@ -1026,12 +1087,14 @@ namespace Library
         {
             var str = param.Value as string;
 
-            if (string.IsNullOrEmpty(str)) {
+            if (string.IsNullOrEmpty(str))
+            {
                 param.Value = DBNull.Value;
                 return;
             }
 
-            if (sizeDeclared) {
+            if (sizeDeclared)
+            {
                 param.Value = str.Max(param.Size);
                 return;
             }
@@ -1128,6 +1191,7 @@ namespace Library
     public class Sql<T> : ISql<T>
     {
         public string TableName { get; set; }
+
         public bool AutoLocking { get; set; }
 
         private IDatabase db = null;
@@ -1446,8 +1510,7 @@ namespace Library
             {
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
                 p.AddRange(Parameter.CreateFromObject(whereArg));
-            }
-            else if (arg != null)
+            } else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
             var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values, where);
@@ -1562,8 +1625,7 @@ namespace Library
             {
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
                 p.AddRange(Parameter.CreateFromObject(whereArg));
-            }
-            else if (arg != null)
+            } else if (arg != null)
                 p.AddRange(disabled.IsValueCreated ? Parameter.CreateFromObject(arg, disabled.Value.ToArray()) : Parameter.CreateFromObject(arg));
 
             var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", GetTableNameUpdate, values, where);

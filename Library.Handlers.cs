@@ -7,15 +7,15 @@ using System.Text.RegularExpressions;
 namespace Library.Handlers
 {
     // ===============================================================================================
-    // 
+    //
     // Library.Handler.[Css]
-    // 
+    //
     // ===============================================================================================
 
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 10. 01. 2012
-    // Updated      : 03. 03. 2013
+    // Updated      : 10. 08. 2014
     // Description  : CSS Handler LESS, Minify
     // ===============================================================================================
 
@@ -24,7 +24,11 @@ namespace Library.Handlers
     {
         public void ProcessRequest(HttpContext context)
         {
-            var path = context.Request.RawUrl.Replace('/', '\\');
+            var path = context.Request.RawUrl;
+
+            if (Configuration.IsWindows)
+                path = path.Replace('/', '\\');
+
             if (path[0] == '\\')
                 path = '~' + path;
 
@@ -79,15 +83,15 @@ namespace Library.Handlers
     #endregion
 
     // ===============================================================================================
-    // 
+    //
     // Library.Handler.[Js]
-    // 
+    //
     // ===============================================================================================
 
     // ===============================================================================================
     // Autor        : Peter Širka
     // Created      : 10. 01. 2012
-    // Updated      : 03. 03. 2013
+    // Updated      : 10. 08. 2014
     // Description  : JavaScript Handler Minify
     // ===============================================================================================
 
@@ -96,7 +100,11 @@ namespace Library.Handlers
     {
         public void ProcessRequest(HttpContext context)
         {
-            var path = context.Request.RawUrl.Replace('/', '\\');
+            var path = context.Request.RawUrl;
+
+            if (Configuration.IsWindows)
+                path = path.Replace('/', '\\');
+
             if (path[0] == '\\')
                 path = '~' + path;
 

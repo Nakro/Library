@@ -681,7 +681,7 @@ namespace Library.Modules
 
         private static string Autoprefixer(string value)
         {
-            var prefix = new [] { "appearance", "border-image", "column-count", "column-gap", "column-rule", "display", "transform", "transform-origin", "transition", "user-select", "animation", "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-iteration-count", "animation-direction", "animation-play-state", "opacity", "background", "background-image" };
+            var prefix = new [] { "appearance", "column-count", "column-gap", "column-rule", "display", "transform", "transform-style", "transform-origin", "transition", "user-select", "animation", "perspective", "animation-name", "animation-duration", "animation-timing-function", "animation-delay", "animation-iteration-count", "animation-direction", "animation-play-state", "opacity", "background", "background-image", "font-smoothing", "text-size-adjust", "backface-visibility" };
             var id = "@#auto-vendor-prefix#@";
 
             if (value.IndexOf(id, StringComparison.InvariantCultureIgnoreCase) == -1)
@@ -781,9 +781,18 @@ namespace Library.Modules
                     updated = plus.Replace("linear-", "-webkit-linear-") + delimiter;
                     updated += plus.Replace("linear-", "-moz-linear-") + delimiter;
                     updated += plus.Replace("linear-", "-o-linear-") + delimiter;
-                    updated += plus.Replace("linear-", "-ms-linear-");
+                    updated += plus.Replace("linear-", "-ms-linear-") + delimiter;
                     updated += plus + delimiter;
 
+                    value = value.Replace(property, "[[{0}]]".format(output.Count));
+                    output.Add(updated);
+                    continue;
+                }
+
+                if (name == "text-overflow")
+                {
+                    updated = plus + delimiter;
+                    updated += plus.Replace("text-overflow", "-ms-text-overflow") + delimiter;
                     value = value.Replace(property, "[[{0}]]".format(output.Count));
                     output.Add(updated);
                     continue;
@@ -797,7 +806,7 @@ namespace Library.Modules
 
                     updated = plus + delimiter;
                     updated += plus.Replace("box", "-webkit-box") + delimiter;
-                    updated += plus.Replace("box", "-moz-box");
+                    updated += plus.Replace("box", "-moz-box") + delimiter;
                     value = value.Replace(property, "[[{0}]]".format(output.Count));
                     output.Add(updated);
                     continue;

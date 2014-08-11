@@ -312,6 +312,7 @@ namespace Library
         public static ILibraryAnalyticsProvider AnalyticsProvider { get; set; }
 
         public static Library.Others.Analytics Analytics { get; set; }
+        public static bool IsWindows { get; private set; }
 
         public static bool JsonUnicode { get; set; }
 
@@ -356,6 +357,7 @@ namespace Library
             Configuration.Author = Utils.Config("author");
             Configuration.Version = Utils.Config("version");
 
+            Configuration.IsWindows = System.Environment.OSVersion.Platform.ToString().ToLower() == "windows";
             Configuration.OnImageParserUrl = (dimension, image) => Configuration.Url.Static + Configuration.OnVersion(string.Format("/images/{0}/{1}.jpg", dimension, image.Id));
 
             Configuration.OnDecrypt = (hash, token) =>
@@ -2597,12 +2599,12 @@ namespace Library
 
         public static string PathHelpers(this string source)
         {
-            return string.Format("~/views/helpers/{0}.cshtml", source);
+            return string.Format("~/Views/Helpers/{0}.cshtml", source);
         }
 
         public static string PathShared(this string source)
         {
-            return string.Format("~/views/shared/{0}.cshtml", source);
+            return string.Format("~/Views/Shared/{0}.cshtml", source);
         }
 
         public static string Conjugation(this DateTime source, string language = "")

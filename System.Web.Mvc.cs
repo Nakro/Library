@@ -490,24 +490,35 @@ namespace System.Web.Mvc
                 Social(source, image);
         }
 
-        public static HtmlString Css(this HtmlHelper source, string url = "default.css")
+        public static HtmlString Css(this HtmlHelper source, params string[] url)
         {
             var format = "<link type=\"text/css\" rel=\"stylesheet\" href=\"{0}\" />";
+            var builder = new StringBuilder();
 
-            if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
-                return new HtmlString(string.Format(format, url));
+            foreach (var m in url) {
+                if (m.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || m.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || m.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
+                    builder.Append(string.Format(format, m));
+                else
+                    builder.Append(string.Format(format, Library.Configuration.Url.CSS + Library.Configuration.OnVersion(m)));
+            }
 
-            return new HtmlString(string.Format(format, Library.Configuration.Url.CSS + Library.Configuration.OnVersion(url)));
+            return new HtmlString(builder.ToString());
         }
 
-        public static HtmlString Js(this HtmlHelper source, string url = "default.js")
+        public static HtmlString Js(this HtmlHelper source, params string[] url)
         {
             var format = "<script type=\"text/javascript\" src=\"{0}\"></script>";
+            var builder = new StringBuilder();
 
-            if (url.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || url.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
-                return new HtmlString(string.Format(format, url));
+            foreach (var m in url)
+            {
+                if (m.StartsWith("//", StringComparison.InvariantCultureIgnoreCase) || m.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) || m.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
+                    builder.Append(string.Format(format, m));
+                else
+                    builder.Append(string.Format(format, Library.Configuration.Url.JS + Library.Configuration.OnVersion(m)));
+            }
 
-            return new HtmlString(string.Format(format, Library.Configuration.Url.JS + Library.Configuration.OnVersion(url)));
+            return new HtmlString(builder.ToString());
         }
 
         public static HtmlString Image(this HtmlHelper source, string url, int width = 0, int height = 0, string alt = "", string cls = "")
